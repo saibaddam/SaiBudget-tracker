@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trading P&L Tracker</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #7d8590;
+      --green: #3fb950;
+      --green-dim: #1a3a22;
+      --red: #f85149;
+      --red-dim: #3a1a1a;
+      --blue: #58a6ff;
+      --yellow: #d29922;
+      --yellow-dim: #2d2208;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .logo span { color: var(--blue); }
+
+    .file-controls { display: flex; gap: 8px; align-items: center; }
+
+    .file-name {
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 4px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    button {
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity .15s, background .15s;
+    }
+    button:hover { opacity: .85; }
+    button:disabled { opacity: .4; cursor: default; }
+
+    .btn-primary { background: var(--blue); color: #000; border-color: var(--blue); }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-danger { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+    .btn-save { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+
+    /* ── Main layout ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+    /* ── Add entry form ── */
+    .add-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    .add-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+    input[type="date"],
+    input[type="number"],
+    input[type="text"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 7px 11px;
+      font-size: 14px;
+      outline: none;
+      width: 100%;
+    }
+    input:focus { border-color: var(--blue); }
+    input[type="number"] { width: 140px; }
+    input[type="date"]  { width: 155px; }
+
+    .field-notes input { width: 240px; }
+
+    /* ── Summary stats ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .stat-card .value { font-size: 22px; font-weight: 700; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .neutral { color: var(--text); }
+    .highlight { color: var(--blue); }
+
+    /* ── Week block ── */
+    .week-block {
+      margin-bottom: 32px;
+    }
+
+    .week-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .week-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .week-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+    .week-pnl { font-size: 16px; font-weight: 700; }
+
+    /* Progress bar */
+    .progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 260px;
+    }
+    .progress-bar-bg {
+      flex: 1;
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width .3s ease;
+    }
+    .progress-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    .target-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .target-hit   { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+    .target-close { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-dim); }
+    .target-miss  { color: var(--text-muted); border-color: var(--border); background: var(--surface2); }
+
+    /* ── Table ── */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: var(--surface2);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: .5px;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    td {
+      padding: 10px 14px;
+      white-space: nowrap;
+    }
+
+    .td-date { color: var(--text-muted); }
+    .td-lost { color: var(--red); font-weight: 500; }
+    .td-made { color: var(--green); font-weight: 500; }
+    .td-net-pos { color: var(--green); font-weight: 600; }
+    .td-net-neg { color: var(--red); font-weight: 600; }
+    .td-cumul { color: var(--blue); font-weight: 600; }
+    .td-need { color: var(--yellow); font-size: 12px; }
+    .td-notes { color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+
+    .del-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 3px 6px;
+      font-size: 15px;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    .del-btn:hover { color: var(--red); background: var(--red-dim); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state p { margin-bottom: 6px; }
+    .empty-state .hint { font-size: 12px; opacity: .7; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok   { border-color: var(--green); color: var(--green); }
+    #toast.err  { border-color: var(--red);   color: var(--red);   }
+
+    /* ── API warning ── */
+    #api-warn {
+      background: var(--yellow-dim);
+      border: 1px solid var(--yellow);
+      color: var(--yellow);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      header { flex-wrap: wrap; gap: 10px; }
+      .form-row { flex-direction: column; }
+      input[type="number"] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">Sai<span>Budget</span> Trading Tracker</div>
+  <div class="file-controls">
+    <span class="file-name" id="file-name">No file loaded</span>
+    <button class="btn-secondary" onclick="newFile()">New File</button>
+    <button class="btn-secondary" onclick="openFile()">Open File</button>
+    <button class="btn-save"      onclick="saveFile()" id="save-btn" disabled>Save</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- API Support Warning -->
+  <div id="api-warn">
+    Your browser does not support the File System Access API. Data will not persist between sessions.
+    Use Chrome or Edge for full file-save support.
+  </div>
+
+  <!-- Add Entry Form -->
+  <div class="add-card">
+    <h2>Add Entry</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label>Money Lost ($)</label>
+        <input type="number" id="f-lost" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Money Made ($)</label>
+        <input type="number" id="f-made" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field field-notes">
+        <label>Notes (optional)</label>
+        <input type="text" id="f-notes" placeholder="e.g. TSLA options">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn-primary" onclick="addEntry()">+ Add Entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="stats-row" id="stats-row"></div>
+
+  <!-- Weekly Entries -->
+  <div id="weeks-container"></div>
+
+</main>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────
+const WEEKLY_TARGET = 2500;
+
+// ── State ──────────────────────────────────────────────────
+let fileHandle = null;
+let data = { entries: [] };  // { entries: [{id, date, lost, made, notes}] }
+let dirty = false;
+
+// ── Init ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.showOpenFilePicker) {
+    document.getElementById('api-warn').style.display = 'block';
+  }
+  // Default date to today
+  document.getElementById('f-date').value = todayISO();
+  render();
+});
+
+// ── File System Access API ─────────────────────────────────
+async function newFile() {
+  if (dirty && !confirm('You have unsaved changes. Create a new file anyway?')) return;
+  if (!window.showSaveFilePicker) {
+    data = { entries: [] };
+    fileHandle = null;
+    dirty = false;
+    setFileName('Unsaved (in-memory)');
+    updateSaveBtn();
+    render();
+    toast('New file created (in-memory)', 'ok');
+    return;
+  }
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: 'trading-pnl.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    data = { entries: [] };
+    dirty = false;
+    setFileName(fileHandle.name);
+    updateSaveBtn();
+    await writeFile();
+    render();
+    toast('New file created', 'ok');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Could not create file: ' + e.message, 'err');
+  }
+}
+
+async function openFile() {
+  if (dirty && !confirm('You have unsaved changes. Open another file?')) return;
+  if (!window.showOpenFilePicker) {
+    toast('File System Access API not supported', 'err');
+    return;
+  }
+  try {
+    [fileHandle] = await window.showOpenFilePicker({
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    data = JSON.parse(text);
+    if (!Array.isArray(data.entries)) data.entries = [];
+    dirty = false;
+    setFileName(fileHandle.name);
+    updateSaveBtn();
+    render();
+    toast('File loaded', 'ok');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Could not open file: ' + e.message, 'err');
+  }
+}
+
+async function saveFile() {
+  if (!fileHandle) {
+    if (!window.showSaveFilePicker) { toast('File System API not supported', 'err'); return; }
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'trading-pnl.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+      });
+      setFileName(fileHandle.name);
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('Save cancelled', 'err');
+      return;
+    }
+  }
+  await writeFile();
+}
+
+async function writeFile() {
+  try {
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.close();
+    dirty = false;
+    updateSaveBtn();
+    toast('Saved', 'ok');
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'err');
+  }
+}
+
+// ── Entry CRUD ─────────────────────────────────────────────
+function addEntry() {
+  const date  = document.getElementById('f-date').value;
+  const lost  = parseFloat(document.getElementById('f-lost').value)  || 0;
+  const made  = parseFloat(document.getElementById('f-made').value)  || 0;
+  const notes = document.getElementById('f-notes').value.trim();
+
+  if (!date) { toast('Please select a date', 'err'); return; }
+  if (lost === 0 && made === 0) { toast('Enter at least one value', 'err'); return; }
+
+  data.entries.push({ id: uid(), date, lost, made, notes });
+  data.entries.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Reset form
+  document.getElementById('f-lost').value  = '';
+  document.getElementById('f-made').value  = '';
+  document.getElementById('f-notes').value = '';
+
+  markDirty();
+  render();
+  toast('Entry added', 'ok');
+}
+
+function deleteEntry(id) {
+  if (!confirm('Delete this entry?')) return;
+  data.entries = data.entries.filter(e => e.id !== id);
+  markDirty();
+  render();
+}
+
+// ── Rendering ─────────────────────────────────────────────
+function render() {
+  renderStats();
+  renderWeeks();
+}
+
+function renderStats() {
+  const el = document.getElementById('stats-row');
+  if (data.entries.length === 0) { el.innerHTML = ''; return; }
+
+  const totalMade = data.entries.reduce((s, e) => s + e.made, 0);
+  const totalLost = data.entries.reduce((s, e) => s + e.lost, 0);
+  const netPnl    = totalMade - totalLost;
+  const days      = data.entries.length;
+
+  // Current week stats
+  const weekEntries = getWeekEntries(weekKey(todayISO()));
+  const weekNet = weekEntries.reduce((s, e) => s + e.made - e.lost, 0);
+  const weekRemaining = WEEKLY_TARGET - weekNet;
+
+  el.innerHTML = `
+    <div class="stat-card">
+      <div class="label">All-Time P&L</div>
+      <div class="value ${netPnl >= 0 ? 'pos' : 'neg'}">${fmt(netPnl)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Made</div>
+      <div class="value pos">${fmt(totalMade)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Lost</div>
+      <div class="value neg">${fmt(totalLost)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Trading Days</div>
+      <div class="value neutral">${days}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">This Week P&L</div>
+      <div class="value ${weekNet >= 0 ? 'pos' : 'neg'}">${fmt(weekNet)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Needed for Target</div>
+      <div class="value ${weekRemaining <= 0 ? 'pos' : 'highlight'}">
+        ${weekRemaining <= 0 ? 'TARGET HIT!' : fmt(weekRemaining)}
+      </div>
+    </div>
+  `;
+}
+
+function renderWeeks() {
+  const container = document.getElementById('weeks-container');
+
+  if (data.entries.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📈</div>
+        <p>No entries yet.</p>
+        <p class="hint">Open or create a JSON file, then add your first trade entry above.</p>
+      </div>`;
+    return;
+  }
+
+  // Group entries by week
+  const weekMap = new Map();
+  data.entries.forEach(e => {
+    const wk = weekKey(e.date);
+    if (!weekMap.has(wk)) weekMap.set(wk, []);
+    weekMap.get(wk).push(e);
+  });
+
+  // Sort weeks newest first
+  const weeks = [...weekMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  // Running cumulative total across ALL entries (oldest to newest)
+  const cumulMap = buildCumulMap();
+
+  let html = '';
+  for (const [wk, entries] of weeks) {
+    const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+    const weekNet   = sorted.reduce((s, e) => s + e.made - e.lost, 0);
+    const pct       = Math.min(Math.max(weekNet / WEEKLY_TARGET * 100, 0), 100);
+    const remaining = WEEKLY_TARGET - weekNet;
+    const {mon, sun} = weekRange(wk);
+
+    let badgeClass = 'target-miss';
+    if (weekNet >= WEEKLY_TARGET)   badgeClass = 'target-hit';
+    else if (pct >= 70)             badgeClass = 'target-close';
+
+    const barColor = weekNet >= WEEKLY_TARGET ? 'var(--green)'
+                   : pct >= 70 ? 'var(--yellow)' : 'var(--blue)';
+
+    html += `
+    <div class="week-block">
+      <div class="week-header">
+        <div class="week-title">Week of ${formatDateShort(mon)} – ${formatDateShort(sun)}</div>
+        <div class="week-meta">
+          <span class="week-pnl ${weekNet >= 0 ? 'pos' : 'neg'}">${fmt(weekNet)}</span>
+          <div class="progress-wrap">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" style="width:${pct}%; background:${barColor};"></div>
+            </div>
+            <span class="progress-label">${pct.toFixed(0)}% of ${fmt(WEEKLY_TARGET)}</span>
+          </div>
+          <span class="target-badge ${badgeClass}">
+            ${weekNet >= WEEKLY_TARGET ? '✓ Target Hit' : 'Need ' + fmt(remaining)}
+          </span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Money Lost</th>
+              <th>Money Made</th>
+              <th>Daily Net</th>
+              <th>Cumulative Total</th>
+              <th>Weekly Progress</th>
+              <th>Still Need (Week)</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    let weekRunning = 0;
+    for (const e of sorted) {
+      const net       = e.made - e.lost;
+      weekRunning    += net;
+      const cumul     = cumulMap.get(e.id);
+      const stillNeed = WEEKLY_TARGET - weekRunning;
+      const rowPct    = Math.min(Math.max(weekRunning / WEEKLY_TARGET * 100, 0), 100);
+
+      html += `
+            <tr>
+              <td class="td-date">${formatDate(e.date)}</td>
+              <td class="td-lost">${e.lost > 0 ? '-' + fmt(e.lost) : '–'}</td>
+              <td class="td-made">${e.made > 0 ? '+' + fmt(e.made) : '–'}</td>
+              <td class="${net >= 0 ? 'td-net-pos' : 'td-net-neg'}">${fmt(net)}</td>
+              <td class="td-cumul">${fmt(cumul)}</td>
+              <td>
+                <div class="progress-wrap" style="min-width:120px;">
+                  <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" style="width:${rowPct}%; background:${rowPct >= 100 ? 'var(--green)' : rowPct >= 70 ? 'var(--yellow)' : 'var(--blue)'};"></div>
+                  </div>
+                  <span class="progress-label">${rowPct.toFixed(0)}%</span>
+                </div>
+              </td>
+              <td class="td-need">${stillNeed <= 0 ? '<span class="pos">✓ Done</span>' : fmt(stillNeed)}</td>
+              <td class="td-notes" title="${escHtml(e.notes)}">${escHtml(e.notes) || '–'}</td>
+              <td><button class="del-btn" onclick="deleteEntry('${e.id}')" title="Delete">✕</button></td>
+            </tr>`;
+    }
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+// ── Helpers ────────────────────────────────────────────────
+
+/** Build a map of entry id → cumulative P&L across all entries sorted by date */
+function buildCumulMap() {
+  const sorted = [...data.entries].sort((a, b) => a.date.localeCompare(b.date));
+  const map = new Map();
+  let running = 0;
+  for (const e of sorted) {
+    running += e.made - e.lost;
+    map.set(e.id, running);
+  }
+  return map;
+}
+
+function getWeekEntries(wk) {
+  return data.entries.filter(e => weekKey(e.date) === wk);
+}
+
+/** Returns ISO week key: "YYYY-WNN" */
+function weekKey(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00');
+  const day = d.getDay() || 7;           // Mon=1 … Sun=7
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - day + 1);
+  return mon.toISOString().slice(0, 10); // Monday date as key
+}
+
+/** Returns { mon, sun } formatted strings for a weekKey */
+function weekRange(wkKey) {
+  const mon = new Date(wkKey + 'T00:00:00');
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { mon: mon.toISOString().slice(0, 10), sun: sun.toISOString().slice(0, 10) };
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDate(iso) {
+  const [y, m, d] = iso.split('-');
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${names[+m - 1]} ${+d}, ${y}`;
+}
+function formatDateShort(iso) {
+  const [y, m, d] = iso.split('-');
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${names[+m - 1]} ${+d}`;
+}
+
+function fmt(n) {
+  const abs = Math.abs(n);
+  const str = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? '-' : '') + '$' + str;
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function setFileName(name) {
+  document.getElementById('file-name').textContent = name;
+}
+
+function markDirty() {
+  dirty = true;
+  updateSaveBtn();
+}
+
+function updateSaveBtn() {
+  document.getElementById('save-btn').disabled = !dirty && !!fileHandle;
+  // Always allow manual save attempt
+  document.getElementById('save-btn').disabled = false;
+}
+
+// ── Toast ──────────────────────────────────────────────────
+let _toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+}
+
+// ── Keyboard shortcut: Ctrl+S ──────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveFile();
+  }
+});
+</script>
+</body>
+</html>
