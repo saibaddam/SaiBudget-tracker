@@ -29,7 +29,13 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 # ── Install / update the MCP server ──────────────────────────────────────────
 if [ -d "$INSTALL_DIR/.git" ]; then
   info "Updating existing install at $INSTALL_DIR…"
-  git -C "$INSTALL_DIR" pull --ff-only
+  git -C "$INSTALL_DIR" pull --ff-only || info "Could not fast-forward; keeping the checkout as-is."
+elif [ -f "$INSTALL_DIR/package.json" ]; then
+  # A downloaded copy (zip, or a clone with .git removed) — use it where it is.
+  info "Using the existing copy at $INSTALL_DIR (not a git checkout, so it won't auto-update)."
+elif [ -d "$INSTALL_DIR" ] && [ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
+  die "$INSTALL_DIR already exists and is not a tradingview-mcp checkout.
+    Remove it, or point TRADINGVIEW_MCP_HOME somewhere else."
 else
   info "Cloning tradingview-mcp into $INSTALL_DIR…"
   mkdir -p "$(dirname "$INSTALL_DIR")"
