@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SaiBudget Tracker</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #7d8590;
+      --green: #3fb950;
+      --green-dim: #1a3a22;
+      --red: #f85149;
+      --red-dim: #3a1a1a;
+      --blue: #58a6ff;
+      --yellow: #d29922;
+      --yellow-dim: #2d2208;
+      --radius: 8px;
+
+      /* Chart roles — stepped for the dark chart surface (#161b22) and
+         validated as a categorical set: adjacent CVD ΔE 26.8, contrast >= 3:1.
+         Income/expense are NOT green/red here: that pair reads as ΔE 2.2 under
+         deuteranopia, i.e. one color to ~5% of men. Green/red survive only on
+         signed text, where the +/- sign carries the meaning. */
+      --series-income: #3987e5;
+      --series-expense: #d95926;
+      --series-mag: #3987e5;   /* single hue for magnitude-only bars */
+      --grid: #262c36;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo span { color: var(--blue); }
+
+    .header-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .save-state {
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 4px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      white-space: nowrap;
+    }
+
+    button {
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: opacity .15s, background .15s;
+    }
+    button:hover { opacity: .85; }
+    button:disabled { opacity: .4; cursor: default; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+    .btn-primary { background: var(--blue); color: #000; border-color: var(--blue); }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-danger { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+
+    /* ── Layout ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    section { margin-bottom: 28px; }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    /* ── Month navigation ── */
+    .month-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .month-picker { display: flex; align-items: center; gap: 10px; }
+    .month-label { font-size: 20px; font-weight: 700; min-width: 190px; text-align: center; }
+    .nav-btn { background: var(--surface2); color: var(--text); width: 34px; padding: 6px 0; text-align: center; }
+
+    /* ── Add transaction form ── */
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+    input[type="date"],
+    input[type="number"],
+    input[type="text"],
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 7px 11px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+    }
+    input:focus, select:focus { border-color: var(--blue); }
+    input[type="date"] { width: 155px; }
+    .field-amount input { width: 130px; }
+    .field-type select, .field-cat select { width: 160px; }
+    .field-note input { width: 220px; }
+
+    .editing-banner {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 8px 12px;
+      background: var(--yellow-dim);
+      border: 1px solid var(--yellow);
+      color: var(--yellow);
+      border-radius: var(--radius);
+      font-size: 13px;
+    }
+    .editing-banner.show { display: flex; }
+
+    /* ── Stats ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .stat-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .stat-card .value { font-size: 22px; font-weight: 700; }
+    .stat-card .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .neutral { color: var(--text); }
+    .highlight { color: var(--blue); }
+    .warn { color: var(--yellow); }
+
+    /* ── Charts ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+    .chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+    .chart-title { font-size: 14px; font-weight: 600; }
+    .chart-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+
+    .legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+    .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+    /* Category magnitude bars */
+    .cat-row { margin-bottom: 12px; }
+    .cat-row:last-child { margin-bottom: 0; }
+    /* The name must never be the thing that collapses: it is the only label the
+       bar has. It shrinks to a floor, then the value wraps to its own line. */
+    .cat-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; margin-bottom: 5px; }
+    .cat-name { flex: 1 1 auto; min-width: 90px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cat-value { flex: 0 1 auto; color: var(--text-muted); white-space: nowrap; }
+    .cat-value strong { color: var(--text); font-weight: 600; }
+    .bar-track { height: 10px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 0 4px 4px 0; transition: width .3s ease; }
+
+    /* Trend chart */
+    .chart-plot { position: relative; }
+    .chart-plot svg { width: 100%; height: auto; display: block; }
+    .tick-text { fill: var(--text-muted); font-size: 10px; font-family: inherit; }
+    .value-label { fill: var(--text); font-size: 10px; font-weight: 600; font-family: inherit; }
+    .grid-line { stroke: var(--grid); stroke-width: 1; }
+    .hit-rect { fill: transparent; cursor: pointer; }
+    .hit-rect:hover { fill: rgba(255,255,255,.03); }
+
+    .chart-tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity .12s;
+      z-index: 10;
+      box-shadow: 0 4px 14px rgba(0,0,0,.45);
+    }
+    .chart-tooltip.show { opacity: 1; }
+    .tt-title { font-weight: 600; margin-bottom: 5px; }
+    .tt-row { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
+    .tt-row strong { color: var(--text); margin-left: auto; padding-left: 14px; font-weight: 600; }
+
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 2px 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .link-btn:hover { color: var(--blue); }
+
+    .data-table { display: none; margin-top: 14px; }
+    .data-table.show { display: block; }
+
+    /* ── Budgets ── */
+    .budget-row {
+      display: grid;
+      grid-template-columns: 1fr 100px;
+      gap: 12px 14px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .budget-row:last-child { border-bottom: none; }
+    .budget-main { min-width: 0; }
+    .budget-row .cat-value { flex: 0 1 auto; margin-left: auto; }
+    .budget-input { width: 100px; text-align: right; }
+    .budget-status { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+    .status-over { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+    .status-near { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-dim); }
+    .status-ok { color: var(--text-muted); border-color: var(--border); background: var(--surface2); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      background: var(--surface2);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: .5px;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    td { padding: 10px 14px; white-space: nowrap; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .td-date { color: var(--text-muted); }
+    .td-note { color: var(--text-muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+    }
+    .tag .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+
+    .row-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 3px 6px;
+      font-size: 14px;
+      line-height: 1;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .row-btn:hover { color: var(--blue); background: var(--surface2); }
+    .row-btn.del:hover { color: var(--red); background: var(--red-dim); }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state p { margin-bottom: 6px; }
+    .empty-state .hint { font-size: 12px; opacity: .8; margin-bottom: 16px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok  { border-color: var(--green); color: var(--green); }
+    #toast.err { border-color: var(--red);   color: var(--red);   }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+
+    @media (max-width: 640px) {
+      main { padding: 18px 14px 48px; }
+      .form-row { flex-direction: column; align-items: stretch; }
+      .field input, .field select { width: 100% !important; }
+      .month-nav { justify-content: center; }
+      .month-label { min-width: 150px; font-size: 17px; }
+      .budget-row { grid-template-columns: 1fr 84px; }
+      .budget-input { width: 84px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Sai<span>Budget</span> Tracker</div>
+  <div class="header-controls">
+    <span class="save-state" id="save-state">Saved locally</span>
+    <button class="btn-secondary" id="btn-export-json">Export JSON</button>
+    <button class="btn-secondary" id="btn-export-csv">Export CSV</button>
+    <button class="btn-secondary" id="btn-import">Import</button>
+    <input type="file" id="import-input" accept="application/json,.json" class="sr-only">
+  </div>
+</header>
+
+<main>
+
+  <!-- Month navigation -->
+  <div class="month-nav">
+    <div class="month-picker">
+      <button class="nav-btn" id="btn-prev-month" title="Previous month" aria-label="Previous month">‹</button>
+      <div class="month-label" id="month-label">—</div>
+      <button class="nav-btn" id="btn-next-month" title="Next month" aria-label="Next month">›</button>
+    </div>
+    <button class="btn-secondary" id="btn-this-month">Jump to this month</button>
+  </div>
+
+  <!-- Summary stats -->
+  <section>
+    <div class="stats-row" id="stats-row"></div>
+  </section>
+
+  <!-- Add / edit transaction -->
+  <section>
+    <div class="card">
+      <div class="section-title" id="form-title">Add transaction</div>
+
+      <div class="editing-banner" id="editing-banner">
+        <span id="editing-text">Editing an existing transaction.</span>
+        <button class="btn-secondary" id="btn-cancel-edit">Cancel</button>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="f-date">Date</label>
+          <input type="date" id="f-date">
+        </div>
+        <div class="field field-type">
+          <label for="f-type">Type</label>
+          <select id="f-type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
+        <div class="field field-cat">
+          <label for="f-category">Category</label>
+          <select id="f-category"></select>
+        </div>
+        <div class="field field-amount">
+          <label for="f-amount">Amount ($)</label>
+          <input type="number" id="f-amount" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field field-note">
+          <label for="f-note">Note (optional)</label>
+          <input type="text" id="f-note" placeholder="e.g. weekly shop" maxlength="120">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn-primary" id="btn-submit">+ Add</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Charts -->
+  <section>
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <div class="chart-title">Spending by category</div>
+        </div>
+        <div class="chart-sub" id="cat-chart-sub">—</div>
+        <div id="cat-chart"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <div class="chart-title">Income vs expenses</div>
+          <button class="link-btn" id="btn-trend-table">Show table</button>
+        </div>
+        <div class="chart-sub">Last 6 months</div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-swatch" style="background: var(--series-income)"></span>Income</span>
+          <span class="legend-item"><span class="legend-swatch" style="background: var(--series-expense)"></span>Expenses</span>
+        </div>
+        <div class="chart-plot" id="trend-plot">
+          <div id="trend-chart"></div>
+          <div class="chart-tooltip" id="trend-tooltip"></div>
+        </div>
+        <div class="data-table" id="trend-table"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Budgets -->
+  <section>
+    <div class="section-title">Monthly budgets</div>
+    <div class="card" id="budgets-card"></div>
+  </section>
+
+  <!-- Transactions -->
+  <section>
+    <div class="section-title" id="tx-title">Transactions</div>
+    <div id="tx-container"></div>
+  </section>
+
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────
+const STORAGE_KEY = 'saibudget.tracker.v1';
+const SCHEMA_VERSION = 1;
+const TREND_MONTHS = 6;
+
+const DEFAULT_CATEGORIES = {
+  income:  ['Salary', 'Freelance', 'Investments', 'Gifts', 'Other income'],
+  expense: ['Rent', 'Groceries', 'Utilities', 'Transport', 'Dining', 'Shopping',
+            'Health', 'Entertainment', 'Subscriptions', 'Other']
+};
+
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const NEW_CATEGORY_VALUE = '__new__';
+
+// ── State ──────────────────────────────────────────────────
+let db = emptyDb();
+let viewMonth = todayISO().slice(0, 7);   // 'YYYY-MM'
+let editingId = null;
+
+function emptyDb() {
+  return {
+    version: SCHEMA_VERSION,
+    transactions: [],   // { id, date, type, category, amount, note }
+    budgets: {},        // { [expenseCategory]: monthlyLimit }
+    categories: { income: [...DEFAULT_CATEGORIES.income], expense: [...DEFAULT_CATEGORIES.expense] }
+  };
+}
+
+// ── Init ───────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  load();
+  document.getElementById('f-date').value = todayISO();
+  bindEvents();
+  render();
+});
+
+function bindEvents() {
+  document.getElementById('btn-prev-month').addEventListener('click', () => shiftMonth(-1));
+  document.getElementById('btn-next-month').addEventListener('click', () => shiftMonth(1));
+  document.getElementById('btn-this-month').addEventListener('click', () => {
+    viewMonth = todayISO().slice(0, 7);
+    render();
+  });
+
+  document.getElementById('f-type').addEventListener('change', () => renderCategoryOptions());
+  document.getElementById('f-category').addEventListener('change', onCategorySelectChange);
+  document.getElementById('btn-submit').addEventListener('click', submitForm);
+  document.getElementById('btn-cancel-edit').addEventListener('click', cancelEdit);
+
+  document.getElementById('f-amount').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitForm();
+  });
+  document.getElementById('f-note').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitForm();
+  });
+
+  document.getElementById('btn-export-json').addEventListener('click', exportJson);
+  document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
+  document.getElementById('btn-import').addEventListener('click', () => {
+    document.getElementById('import-input').click();
+  });
+  document.getElementById('import-input').addEventListener('change', importJson);
+
+  document.getElementById('btn-trend-table').addEventListener('click', e => {
+    const table = document.getElementById('trend-table');
+    const shown = table.classList.toggle('show');
+    e.currentTarget.textContent = shown ? 'Hide table' : 'Show table';
+  });
+
+  // Delegated row actions (edit / delete / sample data).
+  document.querySelector('main').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id } = btn.dataset;
+    if (action === 'edit')   startEdit(id);
+    if (action === 'delete') deleteTransaction(id);
+    if (action === 'sample') loadSampleData();
+  });
+
+  // The trend chart picks its geometry from the card width, so it has to be
+  // rebuilt when that width crosses the narrow breakpoint.
+  let lastNarrow = isNarrowChart();
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (isNarrowChart() === lastNarrow) return;
+      lastNarrow = isNarrowChart();
+      renderTrendChart();
+    }, 150);
+  });
+
+  // Budget limit edits.
+  document.getElementById('budgets-card').addEventListener('change', e => {
+    const input = e.target.closest('.budget-input');
+    if (!input) return;
+    setBudget(input.dataset.category, input.value);
+  });
+}
+
+// ── Persistence ────────────────────────────────────────────
+function load() {
+  let raw;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (err) {
+    setSaveState('Storage unavailable — data will not persist', true);
+    return;
+  }
+  if (!raw) return;
+  try {
+    db = normalize(JSON.parse(raw));
+  } catch (err) {
+    setSaveState('Saved data unreadable — started fresh', true);
+    toast('Could not read saved data, starting fresh', 'err');
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    setSaveState('Saved locally');
+  } catch (err) {
+    setSaveState('Save failed — export a backup', true);
+    toast('Could not save: ' + err.message, 'err');
+  }
+}
+
+/** Coerce arbitrary parsed JSON into a valid db, dropping anything malformed. */
+function normalize(input) {
+  const out = emptyDb();
+  if (!input || typeof input !== 'object') return out;
+
+  if (Array.isArray(input.transactions)) {
+    out.transactions = input.transactions
+      .filter(t => t && typeof t === 'object')
+      .map(t => ({
+        id: typeof t.id === 'string' && t.id ? t.id : uid(),
+        date: isIsoDate(t.date) ? t.date : todayISO(),
+        type: t.type === 'income' ? 'income' : 'expense',
+        category: typeof t.category === 'string' && t.category.trim() ? t.category.trim() : 'Other',
+        amount: Math.abs(Number(t.amount)) || 0,
+        note: typeof t.note === 'string' ? t.note.slice(0, 120) : ''
+      }))
+      .filter(t => t.amount > 0);
+  }
+
+  if (input.categories && typeof input.categories === 'object') {
+    for (const kind of ['income', 'expense']) {
+      const list = input.categories[kind];
+      if (Array.isArray(list) && list.length) {
+        out.categories[kind] = [...new Set(
+          list.filter(c => typeof c === 'string' && c.trim()).map(c => c.trim())
+        )];
+      }
+    }
+  }
+
+  // Any category referenced by a transaction must exist in the picker.
+  for (const t of out.transactions) {
+    const list = out.categories[t.type];
+    if (!list.includes(t.category)) list.push(t.category);
+  }
+
+  if (input.budgets && typeof input.budgets === 'object') {
+    for (const [cat, limit] of Object.entries(input.budgets)) {
+      const n = Number(limit);
+      if (Number.isFinite(n) && n > 0) out.budgets[cat] = n;
+    }
+  }
+
+  out.version = SCHEMA_VERSION;
+  return out;
+}
+
+function setSaveState(text, isError = false) {
+  const el = document.getElementById('save-state');
+  el.textContent = text;
+  el.style.color = isError ? 'var(--red)' : '';
+  el.style.borderColor = isError ? 'var(--red)' : '';
+}
+
+// ── Transaction CRUD ───────────────────────────────────────
+function submitForm() {
+  const date = document.getElementById('f-date').value;
+  const type = document.getElementById('f-type').value;
+  const category = document.getElementById('f-category').value;
+  const amount = Number(document.getElementById('f-amount').value);
+  const note = document.getElementById('f-note').value.trim();
+
+  if (!isIsoDate(date)) { toast('Pick a valid date', 'err'); return; }
+  if (!category || category === NEW_CATEGORY_VALUE) { toast('Pick a category', 'err'); return; }
+  if (!Number.isFinite(amount) || amount <= 0) { toast('Enter an amount greater than 0', 'err'); return; }
+
+  if (editingId) {
+    const tx = db.transactions.find(t => t.id === editingId);
+    if (!tx) { cancelEdit(); toast('That transaction no longer exists', 'err'); return; }
+    Object.assign(tx, { date, type, category, amount, note });
+    editingId = null;
+    toast('Transaction updated', 'ok');
+  } else {
+    db.transactions.push({ id: uid(), date, type, category, amount, note });
+    toast('Transaction added', 'ok');
+  }
+
+  // Follow the entry the user just made, so it is visible after saving.
+  viewMonth = date.slice(0, 7);
+
+  save();
+  resetForm();
+  render();
+}
+
+function startEdit(id) {
+  const tx = db.transactions.find(t => t.id === id);
+  if (!tx) return;
+  editingId = id;
+
+  document.getElementById('f-date').value = tx.date;
+  document.getElementById('f-type').value = tx.type;
+  renderCategoryOptions(tx.category);
+  document.getElementById('f-amount').value = tx.amount;
+  document.getElementById('f-note').value = tx.note;
+
+  document.getElementById('form-title').textContent = 'Edit transaction';
+  document.getElementById('btn-submit').textContent = 'Save changes';
+  document.getElementById('editing-text').textContent =
+    `Editing ${tx.type} of ${fmt(tx.amount)} on ${formatDate(tx.date)}.`;
+  document.getElementById('editing-banner').classList.add('show');
+
+  document.getElementById('f-amount').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  resetForm();
+}
+
+function resetForm() {
+  editingId = null;
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-note').value = '';
+  document.getElementById('form-title').textContent = 'Add transaction';
+  document.getElementById('btn-submit').textContent = '+ Add';
+  document.getElementById('editing-banner').classList.remove('show');
+}
+
+function deleteTransaction(id) {
+  const tx = db.transactions.find(t => t.id === id);
+  if (!tx) return;
+  if (!confirm(`Delete ${tx.type} of ${fmt(tx.amount)} (${tx.category}) on ${formatDate(tx.date)}?`)) return;
+  db.transactions = db.transactions.filter(t => t.id !== id);
+  if (editingId === id) cancelEdit();
+  save();
+  render();
+  toast('Transaction deleted', 'ok');
+}
+
+function setBudget(category, rawValue) {
+  const n = Number(rawValue);
+  if (rawValue === '' || !Number.isFinite(n) || n <= 0) delete db.budgets[category];
+  else db.budgets[category] = n;
+  save();
+  render();
+}
+
+function onCategorySelectChange(e) {
+  if (e.target.value !== NEW_CATEGORY_VALUE) return;
+  const kind = document.getElementById('f-type').value;
+  const name = (prompt('New ' + kind + ' category name:') || '').trim().slice(0, 40);
+  if (!name) { renderCategoryOptions(); return; }
+  if (!db.categories[kind].some(c => c.toLowerCase() === name.toLowerCase())) {
+    db.categories[kind].push(name);
+    save();
+  }
+  const existing = db.categories[kind].find(c => c.toLowerCase() === name.toLowerCase());
+  renderCategoryOptions(existing);
+  renderBudgets();
+}
+
+// ── Rendering ──────────────────────────────────────────────
+function render() {
+  document.getElementById('month-label').textContent = monthLabel(viewMonth);
+  renderCategoryOptions(document.getElementById('f-category').value || undefined);
+  renderStats();
+  renderCategoryChart();
+  renderTrendChart();
+  renderBudgets();
+  renderTransactions();
+}
+
+function renderCategoryOptions(selected) {
+  const kind = document.getElementById('f-type').value;
+  const sel = document.getElementById('f-category');
+  const list = db.categories[kind];
+  const keep = selected && list.includes(selected) ? selected : list[0];
+
+  sel.innerHTML = list.map(c => `<option value="${escAttr(c)}">${escHtml(c)}</option>`).join('')
+    + `<option value="${NEW_CATEGORY_VALUE}">+ New category…</option>`;
+  sel.value = keep ?? '';
+}
+
+function renderStats() {
+  const tx = monthTransactions(viewMonth);
+  const income = sum(tx.filter(t => t.type === 'income'));
+  const expenses = sum(tx.filter(t => t.type === 'expense'));
+  const net = income - expenses;
+  const savingsRate = income > 0 ? (net / income) * 100 : null;
+
+  const budgeted = Object.entries(db.budgets)
+    .reduce((s, [, limit]) => s + limit, 0);
+  const budgetPct = budgeted > 0 ? (expenses / budgeted) * 100 : null;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Income</div>
+      <div class="value pos">${fmt(income)}</div>
+      <div class="sub">${tx.filter(t => t.type === 'income').length} entries</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Expenses</div>
+      <div class="value neg">${fmt(expenses)}</div>
+      <div class="sub">${tx.filter(t => t.type === 'expense').length} entries</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Net</div>
+      <div class="value ${net >= 0 ? 'pos' : 'neg'}">${net >= 0 ? '+' : '−'}${fmt(Math.abs(net))}</div>
+      <div class="sub">${net >= 0 ? 'Surplus' : 'Shortfall'} this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Savings rate</div>
+      <div class="value ${savingsRate === null ? 'neutral' : savingsRate >= 0 ? 'highlight' : 'neg'}">
+        ${savingsRate === null ? '—' : savingsRate.toFixed(0) + '%'}
+      </div>
+      <div class="sub">${savingsRate === null ? 'No income recorded' : 'of income kept'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Budget used</div>
+      <div class="value ${budgetPct === null ? 'neutral' : budgetPct > 100 ? 'neg' : budgetPct >= 80 ? 'warn' : 'highlight'}">
+        ${budgetPct === null ? '—' : budgetPct.toFixed(0) + '%'}
+      </div>
+      <div class="sub">${budgeted > 0 ? fmt(expenses) + ' of ' + fmt(budgeted) : 'No budgets set'}</div>
+    </div>
+  `;
+}
+
+function renderCategoryChart() {
+  const el = document.getElementById('cat-chart');
+  const sub = document.getElementById('cat-chart-sub');
+  const expenses = monthTransactions(viewMonth).filter(t => t.type === 'expense');
+  const total = sum(expenses);
+
+  if (!expenses.length) {
+    sub.textContent = monthLabel(viewMonth);
+    el.innerHTML = `<div class="empty-state" style="padding:32px 12px">
+      <p class="hint" style="margin:0">No spending recorded for ${escHtml(monthLabel(viewMonth))}.</p>
+    </div>`;
+    return;
+  }
+
+  const byCat = new Map();
+  for (const t of expenses) byCat.set(t.category, (byCat.get(t.category) || 0) + t.amount);
+  const rows = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
+  const max = rows[0][1];
+
+  sub.textContent = `${monthLabel(viewMonth)} · ${fmt(total)} across ${rows.length} categor${rows.length === 1 ? 'y' : 'ies'}`;
+
+  // Single hue: the row label already carries identity, so color encodes
+  // nothing extra here and a per-bar hue would be decoration.
+  el.innerHTML = rows.map(([cat, amount]) => {
+    const pct = (amount / total) * 100;
+    const width = (amount / max) * 100;
+    return `
+      <div class="cat-row">
+        <div class="cat-meta">
+          <span class="cat-name" title="${escAttr(cat)}">${escHtml(cat)}</span>
+          <span class="cat-value"><strong>${fmt(amount)}</strong> · ${pct.toFixed(0)}%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${width.toFixed(2)}%; background: var(--series-mag);"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function isNarrowChart() {
+  const el = document.getElementById('trend-chart');
+  return (el && el.clientWidth ? el.clientWidth : 640) < 420;
+}
+
+function renderTrendChart() {
+  const months = [];
+  for (let i = TREND_MONTHS - 1; i >= 0; i--) months.push(monthAdd(viewMonth, -i));
+
+  const series = months.map(m => {
+    const tx = monthTransactions(m);
+    return {
+      month: m,
+      income: sum(tx.filter(t => t.type === 'income')),
+      expenses: sum(tx.filter(t => t.type === 'expense'))
+    };
+  });
+
+  const peak = Math.max(...series.map(s => Math.max(s.income, s.expenses)), 0);
+  const container = document.getElementById('trend-chart');
+
+  if (peak === 0) {
+    container.innerHTML = `<div class="empty-state" style="padding:32px 12px">
+      <p class="hint" style="margin:0">Nothing recorded in these six months yet.</p>
+    </div>`;
+    renderTrendTable(series);
+    return;
+  }
+
+  // Layout in viewBox units; the svg scales to the card width. Narrow cards get
+  // a smaller viewBox so the labels, sized in those units, scale back up to a
+  // readable pixel size instead of shrinking to ~5px on a phone.
+  const narrow = isNarrowChart();
+  const W = narrow ? 340 : 640;
+  const H = narrow ? 210 : 250;
+  const padL = narrow ? 40 : 56;
+  const padR = narrow ? 8 : 14;
+  const padT = narrow ? 18 : 22;
+  const padB = narrow ? 28 : 34;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const baseline = padT + plotH;
+
+  const { max: yMax, step } = niceScale(peak);
+  const groupW = plotW / series.length;
+  const barGap = 2;                                   // surface gap between adjacent fills
+  const barW = Math.min(narrow ? 16 : 30, (groupW * 0.62 - barGap) / 2);
+  const scale = v => (v / yMax) * plotH;
+
+  const ticks = [];
+  for (let v = 0; v <= yMax + 1e-9; v += step) ticks.push(v);
+  const gridSvg = ticks.map(v => {
+    const y = baseline - scale(v);
+    return `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}"></line>
+            <text class="tick-text" x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${compact(v)}</text>`;
+  }).join('');
+
+  const barsSvg = series.map((s, i) => {
+    const cx = padL + groupW * i + groupW / 2;
+    const xIncome = cx - barW - barGap / 2;
+    const xExpense = cx + barGap / 2;
+    const hIncome = scale(s.income);
+    const hExpense = scale(s.expenses);
+    const isLast = i === series.length - 1;
+
+    // Direct labels on the most recent month only — never a number on every mark.
+    const labels = isLast ? `
+      ${s.income   > 0 ? `<text class="value-label" x="${(xIncome + barW / 2).toFixed(1)}" y="${(baseline - hIncome - 6).toFixed(1)}" text-anchor="middle">${compact(s.income)}</text>` : ''}
+      ${s.expenses > 0 ? `<text class="value-label" x="${(xExpense + barW / 2).toFixed(1)}" y="${(baseline - hExpense - 6).toFixed(1)}" text-anchor="middle">${compact(s.expenses)}</text>` : ''}
+    ` : '';
+
+    return `
+      <g>
+        ${s.income   > 0 ? `<path d="${barPath(xIncome, baseline, barW, hIncome, 4)}" fill="var(--series-income)"></path>` : ''}
+        ${s.expenses > 0 ? `<path d="${barPath(xExpense, baseline, barW, hExpense, 4)}" fill="var(--series-expense)"></path>` : ''}
+        ${labels}
+        <text class="tick-text" x="${cx.toFixed(1)}" y="${(baseline + 18).toFixed(1)}" text-anchor="middle">${monthShort(s.month)}</text>
+        <rect class="hit-rect" data-index="${i}" x="${(padL + groupW * i).toFixed(1)}" y="${padT}" width="${groupW.toFixed(1)}" height="${plotH}"></rect>
+      </g>`;
+  }).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Income versus expenses for the last six months">
+      ${gridSvg}
+      <line class="grid-line" x1="${padL}" y1="${baseline}" x2="${W - padR}" y2="${baseline}"></line>
+      ${barsSvg}
+    </svg>`;
+
+  bindTrendTooltip(series);
+  renderTrendTable(series);
+}
+
+function bindTrendTooltip(series) {
+  const plot = document.getElementById('trend-plot');
+  const svg = plot.querySelector('svg');
+  const tip = document.getElementById('trend-tooltip');
+  if (!svg) return;
+
+  const show = (evt, index) => {
+    const s = series[index];
+    const net = s.income - s.expenses;
+    tip.innerHTML = `
+      <div class="tt-title">${escHtml(monthLabel(s.month))}</div>
+      <div class="tt-row"><span class="legend-swatch" style="background: var(--series-income)"></span>Income <strong>${fmt(s.income)}</strong></div>
+      <div class="tt-row"><span class="legend-swatch" style="background: var(--series-expense)"></span>Expenses <strong>${fmt(s.expenses)}</strong></div>
+      <div class="tt-row">Net <strong class="${net >= 0 ? 'pos' : 'neg'}">${net >= 0 ? '+' : '−'}${fmt(Math.abs(net))}</strong></div>`;
+    tip.classList.add('show');
+
+    const bounds = plot.getBoundingClientRect();
+    const x = evt.clientX - bounds.left;
+    const y = evt.clientY - bounds.top;
+    const tipW = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(x + 14, bounds.width - tipW)) + 'px';
+    tip.style.top = Math.max(0, y - tip.offsetHeight - 10) + 'px';
+  };
+
+  svg.addEventListener('mousemove', e => {
+    const hit = e.target.closest('.hit-rect');
+    if (hit) show(e, Number(hit.dataset.index));
+    else tip.classList.remove('show');
+  });
+  svg.addEventListener('mouseleave', () => tip.classList.remove('show'));
+}
+
+function renderTrendTable(series) {
+  document.getElementById('trend-table').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Month</th><th class="num">Income</th><th class="num">Expenses</th><th class="num">Net</th></tr>
+        </thead>
+        <tbody>
+          ${series.map(s => {
+            const net = s.income - s.expenses;
+            return `<tr>
+              <td>${escHtml(monthLabel(s.month))}</td>
+              <td class="num">${fmt(s.income)}</td>
+              <td class="num">${fmt(s.expenses)}</td>
+              <td class="num ${net >= 0 ? 'pos' : 'neg'}">${net >= 0 ? '+' : '−'}${fmt(Math.abs(net))}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderBudgets() {
+  const card = document.getElementById('budgets-card');
+  const spentByCat = new Map();
+  for (const t of monthTransactions(viewMonth)) {
+    if (t.type === 'expense') spentByCat.set(t.category, (spentByCat.get(t.category) || 0) + t.amount);
+  }
+
+  // Show every expense category that has either a limit or spending this month.
+  const cats = db.categories.expense.filter(c => db.budgets[c] || spentByCat.get(c));
+  const rest = db.categories.expense.filter(c => !cats.includes(c));
+
+  const rowHtml = cat => {
+    const limit = db.budgets[cat] || 0;
+    const spent = spentByCat.get(cat) || 0;
+    const pct = limit > 0 ? (spent / limit) * 100 : 0;
+    const remaining = limit - spent;
+
+    let statusClass = 'status-ok', statusText = 'No limit set';
+    let barColor = 'var(--series-mag)';
+    if (limit > 0) {
+      if (spent > limit) {
+        statusClass = 'status-over';
+        statusText = '⚠ Over by ' + fmt(-remaining);
+        barColor = 'var(--red)';
+      } else if (pct >= 80) {
+        statusClass = 'status-near';
+        statusText = '● ' + fmt(remaining) + ' left';
+        barColor = 'var(--yellow)';
+      } else {
+        statusClass = 'status-ok';
+        statusText = fmt(remaining) + ' left';
+      }
+    }
+
+    return `
+      <div class="budget-row">
+        <div class="budget-main">
+          <div class="cat-meta">
+            <span class="cat-name" title="${escAttr(cat)}">${escHtml(cat)}</span>
+            <span class="cat-value"><strong>${fmt(spent)}</strong>${limit > 0 ? ' of ' + fmt(limit) : ''}</span>
+            <span class="budget-status ${statusClass}">${statusText}</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${Math.min(pct, 100).toFixed(2)}%; background:${barColor};"></div>
+          </div>
+        </div>
+        <input class="budget-input" type="number" min="0" step="1" inputmode="decimal"
+               data-category="${escAttr(cat)}" value="${limit || ''}" placeholder="Limit"
+               aria-label="Monthly budget for ${escAttr(cat)}">
+      </div>`;
+  };
+
+  card.innerHTML = (cats.length ? cats.map(rowHtml).join('') : `
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">
+        No budgets yet. Set a monthly limit on any category below to track it.
+      </p>`)
+    + (rest.length ? `
+      <details style="margin-top:${cats.length ? '14px' : '0'}">
+        <summary style="cursor:pointer; color: var(--text-muted); font-size:12px;">
+          ${cats.length ? 'Set a limit on another category' : 'Choose a category'} (${rest.length})
+        </summary>
+        <div style="margin-top:10px">${rest.map(rowHtml).join('')}</div>
+      </details>` : '');
+}
+
+function renderTransactions() {
+  const container = document.getElementById('tx-container');
+  const tx = monthTransactions(viewMonth)
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+  document.getElementById('tx-title').textContent =
+    `Transactions · ${monthLabel(viewMonth)}${tx.length ? ' (' + tx.length + ')' : ''}`;
+
+  if (!tx.length) {
+    const hasAny = db.transactions.length > 0;
+    container.innerHTML = `
+      <div class="card">
+        <div class="empty-state">
+          <div class="icon">💰</div>
+          <p>No transactions in ${escHtml(monthLabel(viewMonth))}.</p>
+          <p class="hint">${hasAny
+            ? 'Use the arrows above to browse other months, or add one with the form.'
+            : 'Add your first one with the form above — everything is stored in this browser.'}</p>
+          ${hasAny ? '' : '<button class="btn-secondary" data-action="sample">Load sample data</button>'}
+        </div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th class="num">Amount</th>
+            <th>Note</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tx.map(t => `
+            <tr>
+              <td class="td-date">${formatDate(t.date)}</td>
+              <td>
+                <span class="tag">
+                  <span class="dot" style="background: var(--series-${t.type === 'income' ? 'income' : 'expense'})"></span>
+                  ${t.type === 'income' ? 'Income' : 'Expense'}
+                </span>
+              </td>
+              <td>${escHtml(t.category)}</td>
+              <td class="num ${t.type === 'income' ? 'pos' : 'neg'}">
+                ${t.type === 'income' ? '+' : '−'}${fmt(t.amount)}
+              </td>
+              <td class="td-note" title="${escAttr(t.note)}">${escHtml(t.note) || '–'}</td>
+              <td style="white-space:nowrap">
+                <button class="row-btn" data-action="edit" data-id="${escAttr(t.id)}" title="Edit" aria-label="Edit transaction">✎</button>
+                <button class="row-btn del" data-action="delete" data-id="${escAttr(t.id)}" title="Delete" aria-label="Delete transaction">✕</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Import / export ────────────────────────────────────────
+function exportJson() {
+  download(
+    JSON.stringify(db, null, 2),
+    'application/json',
+    `saibudget-${todayISO()}.json`
+  );
+  toast('Exported JSON backup', 'ok');
+}
+
+function exportCsv() {
+  if (!db.transactions.length) { toast('Nothing to export yet', 'err'); return; }
+  const rows = [['date', 'type', 'category', 'amount', 'note']];
+  for (const t of [...db.transactions].sort((a, b) => a.date.localeCompare(b.date))) {
+    rows.push([t.date, t.type, t.category, t.amount.toFixed(2), t.note]);
+  }
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  download(csv, 'text/csv', `saibudget-${todayISO()}.csv`);
+  toast('Exported CSV', 'ok');
+}
+
+function csvCell(value) {
+  const s = String(value ?? '');
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function download(content, mime, filename) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function importJson(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';   // let the same file be picked again later
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (err) {
+      toast('That file is not valid JSON', 'err');
+      return;
+    }
+    const incoming = normalize(parsed);
+    if (!incoming.transactions.length) {
+      toast('No usable transactions found in that file', 'err');
+      return;
+    }
+    if (db.transactions.length &&
+        !confirm(`Replace the current ${db.transactions.length} transaction(s) with ${incoming.transactions.length} from this file?`)) {
+      return;
+    }
+    db = incoming;
+    cancelEdit();
+    save();
+    render();
+    toast(`Imported ${incoming.transactions.length} transactions`, 'ok');
+  };
+  reader.onerror = () => toast('Could not read that file', 'err');
+  reader.readAsText(file);
+}
+
+function loadSampleData() {
+  const thisMonth = todayISO().slice(0, 7);
+  const day = (m, d) => `${monthAdd(thisMonth, m)}-${String(d).padStart(2, '0')}`;
+  const sample = [
+    [-2, 1, 'income', 'Salary', 4200, 'Monthly pay'],
+    [-2, 3, 'expense', 'Rent', 1450, ''],
+    [-2, 8, 'expense', 'Groceries', 312.40, ''],
+    [-2, 15, 'expense', 'Transport', 96.10, 'Metro pass'],
+    [-2, 21, 'expense', 'Dining', 184.75, ''],
+    [-1, 1, 'income', 'Salary', 4200, 'Monthly pay'],
+    [-1, 2, 'income', 'Freelance', 650, 'Logo project'],
+    [-1, 3, 'expense', 'Rent', 1450, ''],
+    [-1, 6, 'expense', 'Groceries', 428.90, ''],
+    [-1, 11, 'expense', 'Utilities', 138.20, 'Electric + water'],
+    [-1, 17, 'expense', 'Subscriptions', 47.97, ''],
+    [-1, 24, 'expense', 'Shopping', 219.99, 'Winter coat'],
+    [0, 1, 'income', 'Salary', 4200, 'Monthly pay'],
+    [0, 3, 'expense', 'Rent', 1450, ''],
+    [0, 5, 'expense', 'Groceries', 186.32, ''],
+    [0, 7, 'expense', 'Dining', 64.50, 'Birthday dinner'],
+    [0, 9, 'expense', 'Health', 75, 'Pharmacy'],
+  ];
+  db.transactions = sample.map(([m, d, type, category, amount, note]) =>
+    ({ id: uid(), date: day(m, d), type, category, amount, note }));
+  db.budgets = { Rent: 1500, Groceries: 400, Dining: 200, Transport: 120, Subscriptions: 60 };
+  viewMonth = thisMonth;
+  save();
+  render();
+  toast('Sample data loaded — clear it any time by deleting the rows', 'ok');
+}
+
+// ── Data helpers ───────────────────────────────────────────
+function monthTransactions(month) {
+  return db.transactions.filter(t => t.date.slice(0, 7) === month);
+}
+
+function sum(list) {
+  return list.reduce((s, t) => s + t.amount, 0);
+}
+
+function shiftMonth(delta) {
+  viewMonth = monthAdd(viewMonth, delta);
+  render();
+}
+
+/** 'YYYY-MM' shifted by n months. */
+function monthAdd(month, delta) {
+  const [y, m] = month.split('-').map(Number);
+  const total = y * 12 + (m - 1) + delta;
+  const year = Math.floor(total / 12);
+  const mon = total - year * 12;
+  return `${year}-${String(mon + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(month) {
+  const [y, m] = month.split('-').map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+function monthShort(month) {
+  const [y, m] = month.split('-').map(Number);
+  return m === 1 ? `${MONTH_SHORT[m - 1]} ${String(y).slice(2)}` : MONTH_SHORT[m - 1];
+}
+
+/**
+ * Axis scale with a readable step: pick the tick interval first, then round the
+ * maximum up to a multiple of it, so every gridline lands on a round number
+ * (0 / 1.5k / 3k / 4.5k) rather than on a quartered peak (0 / 1.3k / 2.5k …).
+ */
+function niceScale(peak, targetTicks = 4) {
+  if (!(peak > 0)) return { max: 1, step: 1 };
+  const rough = peak / targetTicks;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  const n = rough / magnitude;
+  const step = (n <= 1 ? 1 : n <= 1.5 ? 1.5 : n <= 2 ? 2 : n <= 2.5 ? 2.5
+              : n <= 3 ? 3 : n <= 5 ? 5 : n <= 7.5 ? 7.5 : 10) * magnitude;
+  return { max: Math.ceil(peak / step) * step, step };
+}
+
+/** Vertical bar anchored to the baseline, rounded on the data end only. */
+function barPath(x, baselineY, width, height, radius) {
+  const h = Math.max(height, 1);
+  const r = Math.min(radius, width / 2, h);
+  const top = baselineY - h;
+  return `M${x.toFixed(1)},${baselineY.toFixed(1)}`
+       + `V${(top + r).toFixed(1)}`
+       + `A${r.toFixed(1)},${r.toFixed(1)} 0 0 1 ${(x + r).toFixed(1)},${top.toFixed(1)}`
+       + `H${(x + width - r).toFixed(1)}`
+       + `A${r.toFixed(1)},${r.toFixed(1)} 0 0 1 ${(x + width).toFixed(1)},${(top + r).toFixed(1)}`
+       + `V${baselineY.toFixed(1)}Z`;
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function isIsoDate(s) {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function formatDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${MONTH_SHORT[+m - 1]} ${+d}, ${y}`;
+}
+
+function fmt(n) {
+  const abs = Math.abs(n);
+  return '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Compact axis/label form: $0, $840, $4.2k */
+function compact(n) {
+  if (n === 0) return '$0';
+  if (Math.abs(n) >= 1000) {
+    const k = n / 1000;
+    return '$' + (Math.abs(k) >= 10 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, '')) + 'k';
+  }
+  return '$' + Math.round(n);
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+const escAttr = escHtml;
+
+// ── Toast ──────────────────────────────────────────────────
+let _toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+}
+</script>
+</body>
+</html>
