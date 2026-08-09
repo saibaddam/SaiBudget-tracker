@@ -290,6 +290,84 @@
     #toast.ok   { border-color: var(--green); color: var(--green); }
     #toast.err  { border-color: var(--red);   color: var(--red);   }
 
+    /* ── TradingView chart ── */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    .chart-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .chart-head h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .chart-head h2 .sym { color: var(--blue); }
+
+    .chart-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .chart-controls input[type="text"] { width: 150px; text-transform: uppercase; }
+
+    .quick-syms { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+
+    .sym-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 3px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .sym-chip:hover { color: var(--blue); border-color: var(--blue); opacity: 1; }
+    .sym-chip.active { color: var(--blue); border-color: var(--blue); background: var(--bg); }
+
+    #tv-container {
+      height: 480px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    #tv-container.hidden { display: none; }
+    .quick-syms.hidden { display: none; }
+
+    #tv-fallback {
+      display: none;
+      height: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    #tv-fallback.show { display: flex; }
+    #tv-fallback a { color: var(--blue); }
+
+    /* Clickable ticker inside notes */
+    .ticker-link {
+      color: var(--blue);
+      cursor: pointer;
+      border-bottom: 1px dotted var(--blue);
+    }
+    .ticker-link:hover { opacity: .8; }
+
     /* ── API warning ── */
     #api-warn {
       background: var(--yellow-dim);
@@ -360,6 +438,27 @@
   <!-- Summary Stats -->
   <div class="stats-row" id="stats-row"></div>
 
+  <!-- TradingView Chart -->
+  <div class="chart-card">
+    <div class="chart-head">
+      <h2>Chart · <span class="sym" id="tv-symbol-label">TSLA</span></h2>
+      <div class="chart-controls">
+        <input type="text" id="tv-input" placeholder="Symbol, e.g. AAPL" maxlength="24">
+        <button class="btn-primary" onclick="applySymbolInput()">Load</button>
+        <button class="btn-secondary" id="tv-toggle" onclick="toggleChart()">Hide</button>
+      </div>
+    </div>
+    <div class="quick-syms" id="quick-syms"></div>
+    <div id="tv-container">
+      <div id="tv-fallback">
+        <div>Could not load the TradingView chart.</div>
+        <div>Check your internet connection, or open
+          <a id="tv-fallback-link" href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer">the chart on TradingView</a>.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Weekly Entries -->
   <div id="weeks-container"></div>
 
@@ -372,10 +471,16 @@
 // ── Constants ──────────────────────────────────────────────
 const WEEKLY_TARGET = 2500;
 
+const TV_SCRIPT  = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+const TV_DEFAULT = 'TSLA';
+/** Uppercase words in notes that look like tickers but aren't */
+const NOT_TICKERS = new Set(['CALL','CALLS','PUT','PUTS','BUY','SELL','LONG','SHORT','ITM','OTM','ATM','EOD','PM','AM','USD','P&L','PNL','YOLO','FD','FDS','DTE','IV','SL','TP','ER','CPI','FOMC']);
+
 // ── State ──────────────────────────────────────────────────
 let fileHandle = null;
 let data = { entries: [] };  // { entries: [{id, date, lost, made, notes}] }
 let dirty = false;
+let currentSymbol = TV_DEFAULT;
 
 // ── Init ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -384,6 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Default date to today
   document.getElementById('f-date').value = todayISO();
+  initChart();
   render();
 });
 
@@ -471,6 +577,148 @@ async function writeFile() {
   }
 }
 
+// ── TradingView chart ──────────────────────────────────────
+let _tvTimer;
+
+function initChart() {
+  currentSymbol = normalizeSymbol(storeGet('tv-symbol')) || TV_DEFAULT;
+  document.getElementById('tv-input').value = currentSymbol;
+
+  const input = document.getElementById('tv-input');
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') applySymbolInput();
+  });
+
+  if (storeGet('tv-collapsed') === '1') setChartCollapsed(true);
+  else loadChart(currentSymbol);
+}
+
+/** (Re)build the TradingView Advanced Chart widget for a symbol. */
+function loadChart(symbol) {
+  currentSymbol = symbol;
+  storeSet('tv-symbol', symbol);
+  document.getElementById('tv-symbol-label').textContent = symbol;
+  document.getElementById('tv-fallback-link').href =
+    'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(symbol);
+  document.getElementById('tv-input').value = symbol;
+  renderQuickSyms();
+
+  const container = document.getElementById('tv-container');
+  if (container.classList.contains('hidden')) return;  // rebuilt on re-open
+
+  // The embed script replaces its own container, so start from a fresh host
+  const fallback = document.getElementById('tv-fallback');
+  fallback.classList.remove('show');
+  container.innerHTML = '';
+  container.appendChild(fallback);
+
+  const host = document.createElement('div');
+  host.className = 'tradingview-widget-container';
+  host.style.height = '100%';
+  const widget = document.createElement('div');
+  widget.className = 'tradingview-widget-container__widget';
+  widget.style.height = '100%';
+  host.appendChild(widget);
+  container.appendChild(host);
+
+  const script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src = TV_SCRIPT;
+  script.async = true;
+  script.text = JSON.stringify({
+    autosize: true,
+    symbol: symbol,
+    interval: 'D',
+    timezone: 'Etc/UTC',
+    theme: 'dark',
+    style: '1',
+    locale: 'en',
+    enable_publishing: false,
+    allow_symbol_change: true,
+    hide_side_toolbar: false,
+    support_host: 'https://www.tradingview.com'
+  });
+  script.onerror = showChartFallback;
+  host.appendChild(script);
+
+  // Offline / blocked script: nothing ever renders, so show a way out
+  clearTimeout(_tvTimer);
+  _tvTimer = setTimeout(() => {
+    if (!container.querySelector('iframe')) showChartFallback();
+  }, 6000);
+}
+
+function showChartFallback() {
+  const container = document.getElementById('tv-container');
+  const host = container.querySelector('.tradingview-widget-container');
+  if (host) host.style.display = 'none';
+  document.getElementById('tv-fallback').classList.add('show');
+}
+
+function applySymbolInput() {
+  const raw = document.getElementById('tv-input').value;
+  const sym = normalizeSymbol(raw);
+  if (!sym) { toast('Enter a symbol, e.g. AAPL or NASDAQ:AAPL', 'err'); return; }
+  loadChart(sym);
+}
+
+function toggleChart() {
+  setChartCollapsed(!document.getElementById('tv-container').classList.contains('hidden'));
+}
+
+function setChartCollapsed(collapsed) {
+  document.getElementById('tv-container').classList.toggle('hidden', collapsed);
+  document.getElementById('quick-syms').classList.toggle('hidden', collapsed);
+  document.getElementById('tv-toggle').textContent = collapsed ? 'Show' : 'Hide';
+  storeSet('tv-collapsed', collapsed ? '1' : '0');
+  if (!collapsed) loadChart(currentSymbol);
+}
+
+/** Quick-pick chips: the symbols mentioned most often in entry notes. */
+function renderQuickSyms() {
+  const counts = new Map();
+  data.entries.forEach(e => {
+    extractTickers(e.notes).forEach(t => counts.set(t, (counts.get(t) || 0) + 1));
+  });
+
+  const syms = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8)
+    .map(([t]) => t);
+  if (!syms.includes(currentSymbol)) syms.unshift(currentSymbol);
+
+  document.getElementById('quick-syms').innerHTML = syms.map(s =>
+    `<button class="sym-chip ${s === currentSymbol ? 'active' : ''}" onclick="loadChart('${s}')">${s}</button>`
+  ).join('');
+}
+
+/** Pull ticker-looking tokens (TSLA, $NVDA, NASDAQ:AAPL) out of a note. */
+function extractTickers(notes) {
+  const found = (notes || '').match(/\b[A-Z]{1,6}:[A-Z0-9.]{1,10}\b|\b[A-Z]{1,5}\b/g) || [];
+  return [...new Set(found.filter(t => !NOT_TICKERS.has(t)))];
+}
+
+/** Escaped note text with tickers turned into chart links. */
+function linkifyTickers(notes) {
+  const esc = escHtml(notes);
+  if (!esc) return '';
+  return esc.replace(/\b[A-Z]{1,6}:[A-Z0-9.]{1,10}\b|\b[A-Z]{1,5}\b/g, t =>
+    NOT_TICKERS.has(t) ? t : `<span class="ticker-link" onclick="loadChart('${t}')" title="View ${t} chart">${t}</span>`
+  );
+}
+
+function normalizeSymbol(raw) {
+  const sym = (raw || '').trim().toUpperCase().replace(/^\$/, '');
+  return /^[A-Z0-9:._-]{1,24}$/.test(sym) ? sym : '';
+}
+
+function storeGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function storeSet(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) { /* private mode */ }
+}
+
 // ── Entry CRUD ─────────────────────────────────────────────
 function addEntry() {
   const date  = document.getElementById('f-date').value;
@@ -505,6 +753,7 @@ function deleteEntry(id) {
 function render() {
   renderStats();
   renderWeeks();
+  renderQuickSyms();
 }
 
 function renderStats() {
@@ -651,7 +900,7 @@ function renderWeeks() {
                 </div>
               </td>
               <td class="td-need">${stillNeed <= 0 ? '<span class="pos">✓ Done</span>' : fmt(stillNeed)}</td>
-              <td class="td-notes" title="${escHtml(e.notes)}">${escHtml(e.notes) || '–'}</td>
+              <td class="td-notes" title="${escHtml(e.notes)}">${linkifyTickers(e.notes) || '–'}</td>
               <td><button class="del-btn" onclick="deleteEntry('${e.id}')" title="Delete">✕</button></td>
             </tr>`;
     }
