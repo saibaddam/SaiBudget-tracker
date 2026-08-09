@@ -26,6 +26,26 @@ If you clone it somewhere else, update the path in `.mcp.json`
 (`args` → `.../src/server.js`) accordingly. On Windows, use an absolute path
 such as `C:\\Users\\you\\tradingview-mcp\\src\\server.js`.
 
+### Registering it for every project instead
+
+The committed `.mcp.json` only registers the connector for *this* project. To
+reach the `tv_*` tools from any project, put the same `mcpServers.tradingview`
+entry in your user-level config at `~/.claude/.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "tradingview": {
+      "command": "node",
+      "args": ["${HOME}/tradingview-mcp/src/server.js"]
+    }
+  }
+}
+```
+
+Claude Code reads both files, so either location works and you do not need
+both. The health check below accepts either one.
+
 ## 2. Launch TradingView with the debug protocol
 
 Start TradingView Desktop with Chrome DevTools enabled on port 9222:
@@ -117,6 +137,7 @@ Run `./scripts/tv-health-check.sh` first — it names the failing step directly.
 | `ERR_MODULE_NOT_FOUND` from the connector | `npm install` was never run in the clone — the health check reports this as "dependencies not installed" |
 | `No TradingView chart target found` (CLI exit 2) | TradingView is running with the debug port open but has no chart tab — open one and retry |
 | Connector missing in Claude Code | `.mcp.json` syntax error, or Claude Code was not restarted |
+| Connector works in one project only | It is registered in that project's `.mcp.json` — move the entry to `~/.claude/.mcp.json` to get it everywhere |
 | Windows "Access is denied" from `WindowsApps` | Use `scripts/launch_tv_debug.bat` or the `tv_launch` tool's copy-fallback |
 | Tools return stale data | TradingView is still loading — wait a few seconds and retry |
 | Symbol resolves to an unexpected feed (`BATS:AAPL`) | TradingView picked its default feed; pass an explicit prefix, e.g. `NASDAQ:AAPL` |

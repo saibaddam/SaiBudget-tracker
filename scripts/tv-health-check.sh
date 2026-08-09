@@ -26,7 +26,14 @@ set -uo pipefail
 PORT="${TV_CDP_PORT:-${CDP_PORT:-9222}}"
 HOST="${TV_CDP_HOST:-${CDP_HOST:-127.0.0.1}}"
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-MCP_JSON="$REPO_ROOT/.mcp.json"
+
+# The connector can be registered per-project or for every project at once.
+# Claude Code reads both, so checking only the first would report "not
+# registered" against a user-level install that actually works.
+MCP_JSON_CANDIDATES=(
+  "$REPO_ROOT/.mcp.json"
+  "${HOME:-}/.claude/.mcp.json"
+)
 
 failures=0
 
@@ -49,11 +56,12 @@ fi
 # 2. .mcp.json -- must parse and register the connector. A syntax error here is
 #    silent in Claude Code: the connector simply never appears.
 server_js=""
-if [ ! -f "$MCP_JSON" ]; then
-  fail ".mcp.json not found at $MCP_JSON"
-  hint "run this script from a checkout of the repository"
-else
-  server_js=$(node -e '
+mcp_json=""
+last_error=""
+for candidate in "${MCP_JSON_CANDIDATES[@]}"; do
+  [ -f "$candidate" ] || continue
+
+  parsed=$(node -e '
     const fs = require("fs");
     try {
       const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
@@ -69,15 +77,29 @@ else
       process.stderr.write(String(e.message).split("\n")[0]);
       process.exit(1);
     }
-  ' "$MCP_JSON" 2>&1)
+  ' "$candidate" 2>&1)
 
-  if [ $? -ne 0 ]; then
-    fail ".mcp.json unreadable or missing the tradingview connector"
-    hint "$server_js"
-    server_js=""
-  else
-    pass "connector registered in .mcp.json"
+  if [ $? -eq 0 ]; then
+    server_js="$parsed"
+    mcp_json="$candidate"
+    break
   fi
+  # Keep going: a project file without the connector is not a failure when the
+  # user registered it globally instead. Remember why in case none of them work.
+  last_error="$candidate: $parsed"
+done
+
+if [ -n "$mcp_json" ]; then
+  pass "connector registered in $mcp_json"
+elif [ -n "$last_error" ]; then
+  fail ".mcp.json unreadable or missing the tradingview connector"
+  hint "$last_error"
+else
+  fail "no .mcp.json found with a tradingview connector"
+  for candidate in "${MCP_JSON_CANDIDATES[@]}"; do
+    hint "looked at $candidate"
+  done
+  hint "run this script from a checkout of the repository, or register the connector in ~/.claude/.mcp.json"
 fi
 
 # 3. The server clone itself, at whatever path .mcp.json points to, and its
