@@ -107,8 +107,18 @@ TradingView was probably started normally at some point and is still running
 without CDP. Fully quit it and re-run the launch script — attaching after the
 fact is not possible.
 
-**Port 9222 already in use**
-Another Chromium app has it. Use a different port on both sides:
+**The port answers for a second, then goes dead**
+TradingView traps SIGTERM, so a polite kill can leave the old process — and its
+single-instance lock — alive. That lock then reaps the new instance launched with
+`--remote-debugging-port`, so it looks like it started but the port is gone. This
+is [upstream issue #186](https://github.com/tradesdontlie/tradingview-mcp/issues/186),
+which also affects the launch scripts shipped with `tradingview-mcp` itself. The
+script here escalates to SIGKILL and re-verifies the port two seconds after it
+first answers, so it reports the problem instead of claiming a dead connection.
+
+**Port 9222 already in use, or "not TradingView"**
+Another Chromium app claimed it. The script checks the CDP identity and refuses
+to continue against the wrong app. Quit it, or use another port on both sides:
 `./scripts/launch-tradingview-debug.sh 9333`.
 
 **The MCP server doesn't appear in Claude Code**
