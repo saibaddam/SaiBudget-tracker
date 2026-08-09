@@ -11,13 +11,20 @@
 # --remote-debugging-port; in a remote/cloud session the port check always fails.
 #
 # Usage:  scripts/tv-health-check.sh
-# Env:    TV_DEBUG_PORT   CDP port to probe (default 9222)
+# Env:    TV_CDP_PORT / CDP_PORT   CDP port  (default 9222)
+#         TV_CDP_HOST / CDP_HOST   CDP host  (default 127.0.0.1)
+#
+# Those are the connector's own variables (see its src/connection.js), so the
+# endpoint probed below is by construction the one the connector will dial --
+# a private variable here could pass the probe and still leave the CLI talking
+# to a different port.
 #
 # Exits 0 when every check passes, 1 otherwise.
 
 set -uo pipefail
 
-PORT="${TV_DEBUG_PORT:-9222}"
+PORT="${TV_CDP_PORT:-${CDP_PORT:-9222}}"
+HOST="${TV_CDP_HOST:-${CDP_HOST:-127.0.0.1}}"
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 MCP_JSON="$REPO_ROOT/.mcp.json"
 
@@ -27,7 +34,7 @@ pass() { printf '  \033[32mPASS\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; failures=$((failures + 1)); }
 hint() { printf '        -> %s\n' "$1"; }
 
-printf '\nTradingView MCP health check (port %s)\n\n' "$PORT"
+printf '\nTradingView MCP health check (%s:%s)\n\n' "$HOST" "$PORT"
 
 # 1. node -- required to run both the MCP server and the CLI below.
 if command -v node >/dev/null 2>&1; then
@@ -73,10 +80,25 @@ else
   fi
 fi
 
-# 3. The server clone itself, at whatever path .mcp.json points to.
+# 3. The server clone itself, at whatever path .mcp.json points to, and its
+#    dependencies.
+tv_root=""
+deps_ok=0
 if [ -n "$server_js" ]; then
   if [ -f "$server_js" ]; then
     pass "server present at $server_js"
+    tv_root="$(cd -- "$(dirname -- "$server_js")/.." && pwd)"
+
+    # A skipped `npm install` surfaces far from its cause: the connector dies at
+    # import time with ERR_MODULE_NOT_FOUND, which reads like a connection fault
+    # rather than a missing dependency. Name it here instead.
+    if [ -d "$tv_root/node_modules" ]; then
+      pass "dependencies installed"
+      deps_ok=1
+    else
+      fail "dependencies not installed"
+      hint "cd $tv_root && npm install"
+    fi
   else
     fail "server missing at $server_js"
     hint "git clone https://github.com/tradesdontlie/tradingview-mcp.git ~/tradingview-mcp && (cd ~/tradingview-mcp && npm install)"
@@ -87,50 +109,73 @@ fi
 # 4. The CDP debug port -- isolates a TradingView launch problem from an MCP
 #    configuration problem. Nothing downstream can work until this returns JSON.
 port_ok=0
-version_json=$(curl -sS --max-time 5 --noproxy '127.0.0.1,localhost' \
-  "http://127.0.0.1:$PORT/json/version" 2>&1)
+version_json=$(curl -sS --max-time 5 --noproxy "$HOST,127.0.0.1,localhost" \
+  "http://$HOST:$PORT/json/version" 2>&1)
 curl_rc=$?
 
 if [ "$curl_rc" -ne 0 ] || [ -z "$version_json" ]; then
-  fail "no CDP endpoint on 127.0.0.1:$PORT"
+  fail "no CDP endpoint on $HOST:$PORT"
   hint "quit TradingView completely, then relaunch it with --remote-debugging-port=$PORT"
   hint "an already-running instance does not have the debug port open"
   hint "in a remote/cloud session this failure is expected -- the bridge is local-only"
 elif printf '%s' "$version_json" | grep -q 'TVDesktop'; then
-  pass "TradingView Desktop answering CDP on port $PORT"
+  pass "TradingView Desktop answering CDP on $HOST:$PORT"
   port_ok=1
 else
   # Something is on the port, but it is not TradingView -- most often a stray
   # Chrome or another Electron app already holding 9222.
-  fail "port $PORT is open but is not TradingView Desktop"
-  hint "another Chromium app is holding the port; close it, or set TV_DEBUG_PORT and match it in the launch flag"
+  fail "$HOST:$PORT is open but is not TradingView Desktop"
+  hint "another Chromium app is holding the port; close it, or launch TradingView on a free port and set TV_CDP_PORT to match"
   hint "got: $(printf '%s' "$version_json" | head -c 200)"
 fi
 
 # 5. Live status through the connector's own CLI -- the same reading the
 #    tv_health_check tool reports, but without restarting Claude Code.
-if [ -n "$server_js" ] && [ "$port_ok" -eq 1 ]; then
-  tv_root="$(cd -- "$(dirname -- "$server_js")/.." && pwd)"
+if [ -n "$tv_root" ] && [ "$deps_ok" -eq 1 ] && [ "$port_ok" -eq 1 ]; then
   cli="$tv_root/src/cli/index.js"
 
   if [ ! -f "$cli" ]; then
     fail "connector CLI not found at $cli"
     hint "the clone looks incomplete -- re-clone and run npm install"
   else
-    status=$(cd "$tv_root" && node src/cli/index.js status 2>&1)
+    # Pass the resolved endpoint through explicitly: the CLI defaults to
+    # 127.0.0.1:9222, so without this it could dial somewhere other than the
+    # endpoint just verified above.
+    status=$(cd "$tv_root" && TV_CDP_HOST="$HOST" TV_CDP_PORT="$PORT" \
+      node src/cli/index.js status 2>&1)
+    cli_rc=$?
 
-    if printf '%s' "$status" | grep -Eq '"cdp_connected"[[:space:]]*:[[:space:]]*true'; then
-      pass "cdp_connected: true"
-    else
-      fail "cdp_connected is not true"
-      hint "TradingView may still be loading -- wait a few seconds and retry"
-    fi
+    if [ "$cli_rc" -ne 0 ]; then
+      # A crash is not the same as an unhealthy-but-answering connector; do not
+      # read the key checks below into a stack trace.
+      fail "connector CLI exited $cli_rc without reporting status"
 
-    if printf '%s' "$status" | grep -Eq '"api_available"[[:space:]]*:[[:space:]]*true'; then
-      pass "api_available: true"
+      # It reports failures as JSON ({"success":false,"error":...}); fall back
+      # to a raw trace only if that shape is absent.
+      detail=$(printf '%s' "$status" \
+        | sed -n 's/.*"error"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' | head -1)
+      [ -z "$detail" ] && detail=$(printf '%s' "$status" | grep -m1 'Error')
+      [ -z "$detail" ] && detail=$(printf '%s' "$status" | grep -m1 '[^[:space:]]')
+      [ -n "$detail" ] && hint "$(printf '%s' "$detail" | head -c 200)"
+
+      # Exit 2 is the connector's dedicated connection-failure code.
+      if [ "$cli_rc" -eq 2 ]; then
+        hint "the port answered but the chart target did not -- open a chart tab in TradingView and retry"
+      fi
     else
-      fail "api_available is not true"
-      hint "the chart widget has not finished initialising -- open a chart tab and retry"
+      if printf '%s' "$status" | grep -Eq '"cdp_connected"[[:space:]]*:[[:space:]]*true'; then
+        pass "cdp_connected: true"
+      else
+        fail "cdp_connected is not true"
+        hint "TradingView may still be loading -- wait a few seconds and retry"
+      fi
+
+      if printf '%s' "$status" | grep -Eq '"api_available"[[:space:]]*:[[:space:]]*true'; then
+        pass "api_available: true"
+      else
+        fail "api_available is not true"
+        hint "the chart widget has not finished initialising -- open a chart tab and retry"
+      fi
     fi
 
     printf '\nCLI status output:\n'

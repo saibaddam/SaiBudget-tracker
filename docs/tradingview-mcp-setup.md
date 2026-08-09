@@ -68,16 +68,24 @@ until this returns JSON.
 
 [`scripts/tv-health-check.sh`](../scripts/tv-health-check.sh) runs every
 verification in this guide in order — node, the `.mcp.json` entry, the server
-clone, the debug port, and the live `cdp_connected` / `api_available` reading —
-and prints the fix next to whatever fails:
+clone, its installed dependencies, the debug port, and the live
+`cdp_connected` / `api_available` reading — and prints the fix next to whatever
+fails:
 
 ```bash
 ./scripts/tv-health-check.sh
 ```
 
 It exits `0` only when all checks pass, so it also works as a preflight in a
-shell script. Set `TV_DEBUG_PORT` if you launched TradingView on a port other
-than 9222. Being local-only, it always fails the port check in a cloud session.
+shell script. If you launched TradingView on a port other than 9222, set
+`TV_CDP_PORT` — that is the connector's own variable, so the script and the
+bridge stay pointed at the same endpoint:
+
+```bash
+TV_CDP_PORT=9333 ./scripts/tv-health-check.sh
+```
+
+Being local-only, it always fails the port check in a cloud session.
 
 ## 4. Use it
 
@@ -105,7 +113,9 @@ Run `./scripts/tv-health-check.sh` first — it names the failing step directly.
 |---|---|
 | `CDP connection failed` / `ECONNREFUSED` | TradingView not running with `--remote-debugging-port=9222`, or port blocked — redo steps 2–3 |
 | Fails only in a web/cloud session | Expected — the bridge is local-only, see the note at the top |
-| Port 9222 answers, but not as `TVDesktop` | A stray Chrome/Electron app already holds the port — close it, or launch TradingView on another port and set `TV_DEBUG_PORT` to match |
+| Port 9222 answers, but not as `TVDesktop` | A stray Chrome/Electron app already holds the port — close it, or launch TradingView on another port and set `TV_CDP_PORT` to match |
+| `ERR_MODULE_NOT_FOUND` from the connector | `npm install` was never run in the clone — the health check reports this as "dependencies not installed" |
+| `No TradingView chart target found` (CLI exit 2) | TradingView is running with the debug port open but has no chart tab — open one and retry |
 | Connector missing in Claude Code | `.mcp.json` syntax error, or Claude Code was not restarted |
 | Windows "Access is denied" from `WindowsApps` | Use `scripts/launch_tv_debug.bat` or the `tv_launch` tool's copy-fallback |
 | Tools return stale data | TradingView is still loading — wait a few seconds and retry |
