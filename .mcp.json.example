@@ -1,0 +1,9 @@
+{
+  "_comment": "Template for the local TradingView MCP connection. Run scripts/setup-tradingview-mcp.sh to generate the real .mcp.json (git-ignored) with an absolute path filled in for your machine.",
+  "mcpServers": {
+    "tradingview": {
+      "command": "node",
+      "args": ["/absolute/path/to/tradingview-mcp/src/server.js"]
+    }
+  }
+}

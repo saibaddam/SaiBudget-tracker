@@ -1,0 +1,7 @@
+# Local MCP config — contains machine-specific absolute paths.
+# See .mcp.json.example and docs/tradingview-desktop-setup.md
+.mcp.json
+.mcp.json.bak
+
+node_modules/
+.DS_Store
