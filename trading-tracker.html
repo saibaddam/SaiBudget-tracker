@@ -302,10 +302,182 @@
       display: none;
     }
 
+    /* ── TradingView panel ── */
+    .tv-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    .tv-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 20px;
+    }
+    .tv-head h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-right: auto;
+    }
+    .tv-head input {
+      width: 170px;
+      text-transform: uppercase;
+    }
+    .tv-body { border-top: 1px solid var(--border); }
+    .tv-panel.collapsed .tv-body { display: none; }
+
+    .tv-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 20px 14px; }
+    .tv-chip {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .tv-chip:hover { color: var(--text); border-color: var(--blue); }
+    .tv-chip.active { color: #000; background: var(--blue); border-color: var(--blue); font-weight: 600; }
+
+    #tv-ticker { height: 78px; }
+    #tv-chart  { height: 460px; }
+    .tv-fallback {
+      display: none;
+      padding: 24px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .tv-fallback code {
+      background: var(--surface2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: var(--text);
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .65);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+      overflow-y: auto;
+      z-index: 500;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 760px;
+    }
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-head h2 { font-size: 16px; font-weight: 600; }
+    .modal-body { padding: 20px; }
+    .modal-foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      padding: 2px 8px;
+    }
+    .modal-close:hover { color: var(--red); }
+
+    .help-text { color: var(--text-muted); font-size: 12.5px; line-height: 1.6; margin-bottom: 16px; }
+    .help-text ol { margin: 8px 0 0 18px; }
+    .help-text li { margin-bottom: 4px; }
+
+    .drop-zone {
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 26px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--blue); color: var(--blue); }
+
+    textarea#csv-paste {
+      width: 100%;
+      min-height: 120px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .map-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+    .map-row .field { flex: 1; min-width: 150px; }
+    .map-row select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 10px;
+      border-radius: var(--radius);
+      font-size: 13px;
+    }
+
+    .dupe-opts { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; font-size: 13px; }
+    .dupe-opts label { display: flex; align-items: center; gap: 8px; color: var(--text); cursor: pointer; }
+
+    .import-summary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .preview-wrap { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    .row-dupe { opacity: .5; }
+
+    .tv-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--blue);
+      border: 1px solid var(--blue);
+      border-radius: 3px;
+      padding: 0 4px;
+      margin-right: 6px;
+      vertical-align: 1px;
+    }
+
     @media (max-width: 600px) {
       header { flex-wrap: wrap; gap: 10px; }
       .form-row { flex-direction: column; }
       input[type="number"] { width: 100%; }
+      .tv-head input { width: 100%; }
+      #tv-chart { height: 340px; }
     }
   </style>
 </head>
@@ -316,6 +488,7 @@
   <div class="logo">Sai<span>Budget</span> Trading Tracker</div>
   <div class="file-controls">
     <span class="file-name" id="file-name">No file loaded</span>
+    <button class="btn-secondary" onclick="openImport()">Import Trades</button>
     <button class="btn-secondary" onclick="newFile()">New File</button>
     <button class="btn-secondary" onclick="openFile()">Open File</button>
     <button class="btn-save"      onclick="saveFile()" id="save-btn" disabled>Save</button>
@@ -357,6 +530,28 @@
     </div>
   </div>
 
+  <!-- TradingView -->
+  <div class="tv-panel" id="tv-panel">
+    <div class="tv-head">
+      <h2>Charts</h2>
+      <input type="text" id="tv-symbol" placeholder="NASDAQ:TSLA" spellcheck="false">
+      <button class="btn-primary" onclick="applySymbol()">Load</button>
+      <button class="btn-secondary" onclick="toggleCharts()" id="tv-toggle">Hide</button>
+    </div>
+    <div class="tv-chips" id="tv-chips"></div>
+    <div class="tv-body">
+      <div id="tv-ticker"></div>
+      <div id="tv-chart"></div>
+      <div class="tv-fallback" id="tv-fallback">
+        TradingView's widgets could not load. They are blocked when this file is
+        opened directly from disk (<code>file://</code>) or while offline.
+        Serve the folder over HTTP and reload:
+        <br><code>python3 -m http.server 8000</code> then open
+        <code>http://localhost:8000/trading-tracker.html</code>
+      </div>
+    </div>
+  </div>
+
   <!-- Summary Stats -->
   <div class="stats-row" id="stats-row"></div>
 
@@ -364,6 +559,70 @@
   <div id="weeks-container"></div>
 
 </main>
+
+<!-- Import modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Import Trades</h2>
+      <button class="modal-close" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-text">
+        Paste or upload a CSV of your trades. Rows are grouped by date — profits
+        become <em>money made</em>, losses become <em>money lost</em>.
+        <ol>
+          <li><strong>TradingView:</strong> Strategy Tester → List of Trades → export, or Account Manager → History → export</li>
+          <li><strong>Robinhood / most brokers:</strong> account statement or trade history CSV</li>
+        </ol>
+      </div>
+
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()">
+        Click to choose a CSV file, or drag one here
+      </div>
+      <input type="file" id="csv-file" accept=".csv,.tsv,.txt" style="display:none">
+
+      <textarea id="csv-paste" placeholder="…or paste CSV text here"></textarea>
+
+      <div id="map-section" style="display:none">
+        <div class="map-row">
+          <div class="field">
+            <label>Date column</label>
+            <select id="col-date"></select>
+          </div>
+          <div class="field">
+            <label>Profit / loss column</label>
+            <select id="col-pnl"></select>
+          </div>
+          <div class="field">
+            <label>Symbol column (optional)</label>
+            <select id="col-sym"></select>
+          </div>
+        </div>
+
+        <div class="dupe-opts">
+          <label><input type="radio" name="dupe" value="skip" checked> Skip dates I already have</label>
+          <label><input type="radio" name="dupe" value="replace"> Replace my existing entries on those dates</label>
+          <label><input type="radio" name="dupe" value="add"> Add anyway, alongside existing entries</label>
+        </div>
+
+        <div class="import-summary" id="import-summary"></div>
+        <div class="preview-wrap">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Lost</th><th>Made</th><th>Net</th><th>Trades</th><th>Symbols</th></tr>
+            </thead>
+            <tbody id="preview-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeImport()">Cancel</button>
+      <button class="btn-primary" id="import-btn" onclick="runImport()" disabled>Import</button>
+    </div>
+  </div>
+</div>
 
 <!-- Toast -->
 <div id="toast"></div>
@@ -384,6 +643,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Default date to today
   document.getElementById('f-date').value = todayISO();
+  initTradingView();
+  initImport();
   render();
 });
 
@@ -651,7 +912,7 @@ function renderWeeks() {
                 </div>
               </td>
               <td class="td-need">${stillNeed <= 0 ? '<span class="pos">✓ Done</span>' : fmt(stillNeed)}</td>
-              <td class="td-notes" title="${escHtml(e.notes)}">${escHtml(e.notes) || '–'}</td>
+              <td class="td-notes" title="${escHtml(e.notes)}">${e.source === 'import' ? '<span class="tv-badge">CSV</span>' : ''}${escHtml(e.notes) || '–'}</td>
               <td><button class="del-btn" onclick="deleteEntry('${e.id}')" title="Delete">✕</button></td>
             </tr>`;
     }
@@ -745,6 +1006,369 @@ function updateSaveBtn() {
   document.getElementById('save-btn').disabled = false;
 }
 
+// ── TradingView widgets ────────────────────────────────────
+const TV_SYMBOL_KEY = 'tv_symbol';
+const TV_WATCH_KEY  = 'tv_watchlist';
+const TV_HIDDEN_KEY = 'tv_hidden';
+const DEFAULT_WATCH = ['NASDAQ:TSLA', 'NASDAQ:AMD', 'NASDAQ:NVDA', 'NASDAQ:AAPL', 'AMEX:SPY'];
+
+// localStorage throws in some file:// and private-browsing contexts, so every
+// access is guarded — the charts are a nicety, they must never break the app.
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function tvSymbol() { return lsGet(TV_SYMBOL_KEY) || DEFAULT_WATCH[0]; }
+function tvWatchlist() {
+  try {
+    const saved = JSON.parse(lsGet(TV_WATCH_KEY));
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch (e) {}
+  return DEFAULT_WATCH;
+}
+
+function initTradingView() {
+  document.getElementById('tv-symbol').value = tvSymbol();
+  if (lsGet(TV_HIDDEN_KEY) === '1') {
+    document.getElementById('tv-panel').classList.add('collapsed');
+    document.getElementById('tv-toggle').textContent = 'Show';
+  }
+  renderChips();
+  loadWidgets();
+}
+
+function loadWidgets() {
+  if (document.getElementById('tv-panel').classList.contains('collapsed')) return;
+
+  loadWidget('tv-ticker', 'ticker-tape', {
+    symbols: tvWatchlist().map(s => ({ proName: s, title: s.split(':').pop() })),
+    colorTheme: 'dark', isTransparent: true, displayMode: 'compact', locale: 'en'
+  });
+
+  loadWidget('tv-chart', 'advanced-chart', {
+    symbol: tvSymbol(), interval: 'D', theme: 'dark', style: '1',
+    locale: 'en', autosize: true, hide_side_toolbar: false,
+    allow_symbol_change: true, backgroundColor: 'rgba(13,17,23,1)'
+  });
+
+  // The embed script is fetched from tradingview.com, which fails offline and
+  // is blocked from a file:// origin. If no iframe materialises, say why.
+  setTimeout(() => {
+    if (!document.querySelector('#tv-chart iframe')) {
+      document.getElementById('tv-fallback').style.display = 'block';
+      document.getElementById('tv-ticker').style.display = 'none';
+      document.getElementById('tv-chart').style.display = 'none';
+    }
+  }, 7000);
+}
+
+function loadWidget(hostId, widget, config) {
+  const host = document.getElementById(hostId);
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'tradingview-widget-container';
+  wrap.style.height = '100%';
+  const inner = document.createElement('div');
+  inner.className = 'tradingview-widget-container__widget';
+  inner.style.height = '100%';
+  wrap.appendChild(inner);
+  const s = document.createElement('script');
+  s.src = `https://s3.tradingview.com/external-embedding/embed-widget-${widget}.js`;
+  s.async = true;
+  s.text = JSON.stringify(config);
+  wrap.appendChild(s);
+  host.appendChild(wrap);
+}
+
+function renderChips() {
+  const cur = tvSymbol();
+  document.getElementById('tv-chips').innerHTML = tvWatchlist().map(s =>
+    `<button class="tv-chip ${s === cur ? 'active' : ''}" onclick="pickSymbol('${escHtml(s)}')">${escHtml(s.split(':').pop())}</button>`
+  ).join('');
+}
+
+function pickSymbol(sym) {
+  lsSet(TV_SYMBOL_KEY, sym);
+  document.getElementById('tv-symbol').value = sym;
+  renderChips();
+  loadWidgets();
+}
+
+function applySymbol() {
+  const raw = document.getElementById('tv-symbol').value.trim().toUpperCase();
+  if (!raw) { toast('Enter a symbol, e.g. NASDAQ:TSLA', 'err'); return; }
+  const watch = tvWatchlist();
+  if (!watch.includes(raw)) {
+    watch.unshift(raw);
+    lsSet(TV_WATCH_KEY, JSON.stringify(watch.slice(0, 8)));
+  }
+  pickSymbol(raw);
+  toast('Chart loaded: ' + raw, 'ok');
+}
+
+function toggleCharts() {
+  const panel = document.getElementById('tv-panel');
+  const hidden = panel.classList.toggle('collapsed');
+  lsSet(TV_HIDDEN_KEY, hidden ? '1' : '0');
+  document.getElementById('tv-toggle').textContent = hidden ? 'Show' : 'Hide';
+  if (!hidden) loadWidgets();
+}
+
+// ── CSV import ─────────────────────────────────────────────
+let csvHeaders = [];
+let csvRows    = [];
+let previewRows = [];
+
+function initImport() {
+  document.getElementById('csv-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) file.text().then(loadCsv);
+  });
+
+  const zone = document.getElementById('drop-zone');
+  ['dragover', 'dragleave', 'drop'].forEach(evt => {
+    zone.addEventListener(evt, e => {
+      e.preventDefault();
+      zone.classList.toggle('dragover', evt === 'dragover');
+      if (evt === 'drop' && e.dataTransfer.files[0]) e.dataTransfer.files[0].text().then(loadCsv);
+    });
+  });
+
+  let pasteTimer;
+  document.getElementById('csv-paste').addEventListener('input', e => {
+    clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(() => loadCsv(e.target.value), 400);
+  });
+
+  ['col-date', 'col-pnl', 'col-sym'].forEach(id =>
+    document.getElementById(id).addEventListener('change', buildPreview));
+  document.querySelectorAll('input[name="dupe"]').forEach(r =>
+    r.addEventListener('change', buildPreview));
+}
+
+function openImport() { document.getElementById('import-modal').classList.add('show'); }
+function closeImport() {
+  document.getElementById('import-modal').classList.remove('show');
+  document.getElementById('csv-paste').value = '';
+  document.getElementById('csv-file').value = '';
+  document.getElementById('map-section').style.display = 'none';
+  document.getElementById('import-btn').disabled = true;
+  csvHeaders = []; csvRows = []; previewRows = [];
+}
+
+function loadCsv(text) {
+  if (!text || !text.trim()) return;
+  const rows = parseCSV(text);
+  if (rows.length < 2) { toast('Could not find any data rows', 'err'); return; }
+
+  csvHeaders = rows[0].map(h => h.trim());
+  csvRows    = rows.slice(1);
+
+  const guess = detectColumns(csvHeaders);
+  fillSelect('col-date', csvHeaders, guess.date, false);
+  fillSelect('col-pnl',  csvHeaders, guess.pnl,  false);
+  fillSelect('col-sym',  csvHeaders, guess.sym,  true);
+
+  document.getElementById('map-section').style.display = 'block';
+  buildPreview();
+}
+
+function fillSelect(id, headers, selected, allowNone) {
+  const el = document.getElementById(id);
+  el.innerHTML = (allowNone ? '<option value="-1">— none —</option>' : '') +
+    headers.map((h, i) => `<option value="${i}" ${i === selected ? 'selected' : ''}>${escHtml(h || 'Column ' + (i + 1))}</option>`).join('');
+}
+
+/** Guess which columns hold the date, the realised P&L, and the symbol. */
+function detectColumns(headers) {
+  const lower = headers.map(h => h.toLowerCase());
+  const find = tests => {
+    for (const test of tests) {
+      const i = lower.findIndex(test);
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+
+  // Exit/close dates beat entry dates — realised P&L belongs to the day the
+  // position was closed.
+  const date = find([
+    h => /(exit|clos)/.test(h) && /(date|time)/.test(h),
+    h => /date.*time|time.*date/.test(h),
+    h => /\bdate\b/.test(h),
+    h => /time/.test(h)
+  ]);
+
+  // Percentages and running totals look like P&L columns but are not.
+  const notPct = h => !/%|percent|cumulative|running|balance/.test(h);
+  const pnl = find([
+    h => /realized|realised/.test(h) && notPct(h),
+    h => /net\s*(p|profit)/.test(h) && notPct(h),
+    h => /profit/.test(h) && notPct(h),
+    h => /(p&l|pnl|p\/l|p\.l)/.test(h) && notPct(h),
+    h => /gain|return|amount/.test(h) && notPct(h)
+  ]);
+
+  // Not /contract/ — TradingView's "Contracts" column is position size.
+  const sym = find([h => /symbol|ticker|instrument|security/.test(h)]);
+  return { date, pnl, sym };
+}
+
+function buildPreview() {
+  const di = +document.getElementById('col-date').value;
+  const pi = +document.getElementById('col-pnl').value;
+  const si = +document.getElementById('col-sym').value;
+
+  const byDate = new Map();
+  let skipped = 0;
+
+  for (const r of csvRows) {
+    const date = parseDateCell(r[di]);
+    const pnl  = parseNum(r[pi]);
+    // Rows without a usable date or number are the open/entry legs of a trade,
+    // subtotals, and footers — all of which should be ignored, not zeroed.
+    if (!date || isNaN(pnl)) { skipped++; continue; }
+
+    if (!byDate.has(date)) byDate.set(date, { date, lost: 0, made: 0, count: 0, syms: new Set() });
+    const d = byDate.get(date);
+    if (pnl >= 0) d.made += pnl; else d.lost += -pnl;
+    d.count++;
+    if (si >= 0 && r[si]) d.syms.add(String(r[si]).trim());
+  }
+
+  previewRows = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  const existing = new Set(data.entries.map(e => e.date));
+  const dupes = previewRows.filter(r => existing.has(r.date)).length;
+  const mode = document.querySelector('input[name="dupe"]:checked').value;
+  const willImport = mode === 'skip' ? previewRows.length - dupes : previewRows.length;
+
+  document.getElementById('import-summary').innerHTML =
+    `<strong>${previewRows.length}</strong> day(s) found from ${csvRows.length - skipped} trade row(s)` +
+    (skipped ? ` · ${skipped} row(s) ignored` : '') +
+    (dupes ? ` · <span style="color:var(--yellow)">${dupes} date(s) already in your log</span>` : '') +
+    ` · <strong>${willImport}</strong> will be imported`;
+
+  document.getElementById('preview-body').innerHTML = previewRows.map(r => {
+    const net = r.made - r.lost;
+    const dupe = existing.has(r.date) && mode === 'skip';
+    return `<tr class="${dupe ? 'row-dupe' : ''}">
+      <td class="td-date">${formatDate(r.date)}</td>
+      <td class="td-lost">${r.lost > 0 ? '-' + fmt(r.lost) : '–'}</td>
+      <td class="td-made">${r.made > 0 ? '+' + fmt(r.made) : '–'}</td>
+      <td class="${net >= 0 ? 'td-net-pos' : 'td-net-neg'}">${fmt(net)}</td>
+      <td>${r.count}</td>
+      <td class="td-notes">${escHtml([...r.syms].slice(0, 3).join(', ')) || '–'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="color:var(--text-muted)">No usable rows — check the column picks above.</td></tr>';
+
+  document.getElementById('import-btn').disabled = willImport === 0;
+}
+
+function runImport() {
+  const mode = document.querySelector('input[name="dupe"]:checked').value;
+  const existing = new Set(data.entries.map(e => e.date));
+  let added = 0, replaced = 0, skipped = 0;
+
+  for (const r of previewRows) {
+    if (existing.has(r.date)) {
+      if (mode === 'skip') { skipped++; continue; }
+      if (mode === 'replace') {
+        data.entries = data.entries.filter(e => e.date !== r.date);
+        replaced++;
+      }
+    }
+    const syms = [...r.syms].slice(0, 3).join(', ');
+    data.entries.push({
+      id: uid(),
+      date: r.date,
+      lost: round2(r.lost),
+      made: round2(r.made),
+      notes: syms ? `${syms} (${r.count} trades)` : `${r.count} imported trades`,
+      source: 'import'
+    });
+    added++;
+  }
+
+  data.entries.sort((a, b) => a.date.localeCompare(b.date));
+  markDirty();
+  render();
+  closeImport();
+  toast(`Imported ${added} day(s)` + (replaced ? `, replaced ${replaced}` : '') + (skipped ? `, skipped ${skipped}` : ''), 'ok');
+}
+
+/** RFC4180-ish CSV/TSV parser: handles quoted fields and escaped quotes. */
+function parseCSV(text) {
+  const firstLine = text.slice(0, text.indexOf('\n') === -1 ? text.length : text.indexOf('\n'));
+  const delim = (firstLine.split('\t').length > firstLine.split(',').length) ? '\t' : ',';
+
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === delim) { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (c !== '\r') field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+/** Money to number: strips currency/commas, handles (123.45) and unicode minus. */
+function parseNum(s) {
+  if (s == null) return NaN;
+  let t = String(s).trim();
+  if (!t) return NaN;
+
+  let negative = false;
+  if (/^\(.*\)$/.test(t)) { negative = true; t = t.slice(1, -1); }
+  t = t.replace(/[−–—]/g, '-');
+  t = t.replace(/[^0-9.\-]/g, '');
+  if (!/\d/.test(t)) return NaN;
+
+  const n = parseFloat(t);
+  if (isNaN(n)) return NaN;
+  return negative ? -Math.abs(n) : n;
+}
+
+/** Accepts ISO, US, dotted, "13 May 2024", and epoch seconds/millis. */
+function parseDateCell(s) {
+  if (s == null) return null;
+  const t = String(s).trim();
+  if (!t) return null;
+
+  let m = t.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+
+  m = t.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})/);
+  if (m) return `${m[3]}-${pad2(m[1])}-${pad2(m[2])}`;   // US M/D/YYYY
+
+  m = t.match(/^(\d{1,2})[\s-]([A-Za-z]{3,})[\s-](\d{4})/);
+  if (m) {
+    const mi = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+      .indexOf(m[2].slice(0, 3).toLowerCase());
+    if (mi !== -1) return `${m[3]}-${pad2(mi + 1)}-${pad2(m[1])}`;
+  }
+
+  if (/^\d{10}$/.test(t)) return localISO(new Date(+t * 1000));
+  if (/^\d{13}$/.test(t)) return localISO(new Date(+t));
+
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : localISO(d);
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function round2(n) { return Math.round(n * 100) / 100; }
+function localISO(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 // ── Toast ──────────────────────────────────────────────────
 let _toastTimer;
 function toast(msg, type = '') {
@@ -761,6 +1385,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     saveFile();
   }
+  if (e.key === 'Escape') closeImport();
 });
 </script>
 </body>
