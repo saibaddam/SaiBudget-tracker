@@ -101,7 +101,7 @@ if [ -n "$server_js" ]; then
     fi
   else
     fail "server missing at $server_js"
-    hint "git clone https://github.com/tradesdontlie/tradingview-mcp.git ~/tradingview-mcp && (cd ~/tradingview-mcp && npm install)"
+    hint "git clone https://github.com/tradesdontlie/tradingview-mcp.git ~/Documents/tradingview-mcp && (cd ~/Documents/tradingview-mcp && npm install)"
     hint "or point .mcp.json args[0] at wherever you cloned it"
   fi
 fi

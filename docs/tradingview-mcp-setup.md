@@ -14,25 +14,26 @@ It must run on your own machine — it does not work in a remote/cloud session.
 
 ## 1. Clone and install the server
 
-By default `.mcp.json` expects the server at `$HOME/tradingview-mcp`:
+`.mcp.json` expects the server at `$HOME/Documents/tradingview-mcp`:
 
 ```bash
-git clone https://github.com/tradesdontlie/tradingview-mcp.git ~/tradingview-mcp
-cd ~/tradingview-mcp
+git clone https://github.com/tradesdontlie/tradingview-mcp.git ~/Documents/tradingview-mcp
+cd ~/Documents/tradingview-mcp
 npm install
 ```
 
 If you clone it somewhere else, update the path in `.mcp.json`
-(`args` → `.../src/server.js`) accordingly. On Windows, use an absolute path
-such as `C:\\Users\\you\\tradingview-mcp\\src\\server.js`.
+(`args` → `.../src/server.js`) accordingly. On Windows, `${HOME}` is usually
+unset (the variable is `USERPROFILE`), so use an absolute path such as
+`C:\\Users\\you\\Documents\\tradingview-mcp\\src\\server.js`.
 
 ## 2. Launch TradingView with the debug protocol
 
 Start TradingView Desktop with Chrome DevTools enabled on port 9222:
 
-- macOS:   `~/tradingview-mcp/scripts/launch_tv_debug_mac.sh`
+- macOS:   `~/Documents/tradingview-mcp/scripts/launch_tv_debug_mac.sh`
 - Windows: `tradingview-mcp\scripts\launch_tv_debug.bat`
-- Linux:   `~/tradingview-mcp/scripts/launch_tv_debug_linux.sh`
+- Linux:   `~/Documents/tradingview-mcp/scripts/launch_tv_debug_linux.sh`
 
 Manual equivalents:
 
@@ -94,7 +95,7 @@ picks up `.mcp.json`, then verify with the `tv_health_check` tool, or via the
 CLI (which talks to the port directly and needs no restart):
 
 ```bash
-cd ~/tradingview-mcp && node src/cli/index.js status
+cd ~/Documents/tradingview-mcp && node src/cli/index.js status
 ```
 
 A healthy response reports `"cdp_connected": true` and `"api_available": true`
